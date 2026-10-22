@@ -214,7 +214,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
 
   if (!isAuthorized) {
     return (
-      <div className="fixed inset-0 z-130 bg-[#3C1A11] flex items-center justify-center p-6 text-[#FFF8F0]">
+      <div className="fixed inset-0 z-[130] bg-[#3C1A11] flex items-center justify-center p-6 text-[#FFF8F0]">
         <div className="max-w-md w-full bg-[#FFF8F0] text-[#3C1A11] rounded-3xl p-8 border-2 border-[#D94F27] shadow-2xl text-center space-y-6">
           <div className="w-16 h-16 bg-[#D94F27]/10 text-[#D94F27] rounded-full mx-auto flex items-center justify-center">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -253,7 +253,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   }
 
   return (
-    <div className="fixed inset-0 z-130 bg-[#FFF8F0] text-[#3C1A11] overflow-y-auto flex flex-col font-sans">
+    <div className="fixed inset-0 z-[130] bg-[#FFF8F0] text-[#3C1A11] overflow-y-auto flex flex-col font-sans">
       <header className="sticky top-0 z-40 bg-[#3C1A11] text-[#FFF8F0] border-b-2 border-[#BDF119] px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         
         <div className="flex items-center gap-4">

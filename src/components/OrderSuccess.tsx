@@ -20,7 +20,7 @@ export const OrderSuccess: React.FC<OrderSuccessProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-120 bg-[#FFF8F0] overflow-y-auto text-[#3C1A11] flex flex-col items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[120] bg-[#FFF8F0] overflow-y-auto text-[#3C1A11] flex flex-col items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-xl bg-white border-2 border-[#3C1A11] rounded-3xl p-6 sm:p-10 shadow-2xl text-center relative animate-fade-in">
         
         <div className="inline-flex items-center gap-2 bg-[#3C1A11] text-[#BDF119] px-4 py-1 rounded-full text-xs font-black tracking-widest uppercase mb-4">

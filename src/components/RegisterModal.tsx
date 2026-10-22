@@ -61,7 +61,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-xl my-8 bg-[#FFF8F0] border-2 border-[#3C1A11] rounded-2xl p-6 sm:p-10 shadow-2xl text-[#3C1A11]">
         
         <button

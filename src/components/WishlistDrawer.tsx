@@ -24,7 +24,7 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-120 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div

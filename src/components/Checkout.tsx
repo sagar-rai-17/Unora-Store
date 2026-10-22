@@ -116,7 +116,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-110 bg-[#FFF8F0] overflow-y-auto text-[#3C1A11]">
+    <div className="fixed inset-0 z-[110] bg-[#FFF8F0] overflow-y-auto text-[#3C1A11]">
       <div className="sticky top-0 z-20 bg-[#FFF8F0] border-b-2 border-[#3C1A11] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
