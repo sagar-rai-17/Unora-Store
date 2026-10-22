@@ -94,7 +94,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex justify-end bg-black/60 backdrop-blur-xs"
+      className="fixed inset-0 z-100 flex justify-end bg-black/60 backdrop-blur-xs"
       onClick={onClose}
     >
       <div

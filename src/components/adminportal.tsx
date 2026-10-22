@@ -425,10 +425,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                   <th className="py-3 px-4">Order ID & Time</th>
                   <th className="py-3 px-4">Customer</th>
                   <th className="py-3 px-4">Destination</th>
-                  <th className="py-3 px-4 min-w-[220px]">Order Items & Studio Spec</th>
+                  <th className="py-3 px-4 min-w-220px">Order Items & Studio Spec</th>
                   <th className="py-3 px-4">Payment</th>
                   <th className="py-3 px-4">Grand Total</th>
-                  <th className="py-3 px-4 min-w-[140px]">Fulfillment Status</th>
+                  <th className="py-3 px-4 min-w-140px">Fulfillment Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#3C1A11]/10 bg-white">
