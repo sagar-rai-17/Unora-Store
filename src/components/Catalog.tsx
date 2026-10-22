@@ -32,7 +32,7 @@ export const products: Product[] = [
     price: 899,
     originalPrice: 1199,
     badge: "IIT BHU",
-    image: "/assets/Items/3.png",
+    image: "/assets/items/3.png",
     campus: "IIT BHU",
   },
   {
@@ -41,7 +41,7 @@ export const products: Product[] = [
     price: 949,
     originalPrice: 1299,
     badge: "IIT BHU",
-    image: "/assets/Items/14.png",
+    image: "/assets/items/14.png",
     campus: "IIT BHU",
   },
   {
@@ -50,7 +50,7 @@ export const products: Product[] = [
     price: 899,
     originalPrice: 1199,
     badge: "IIT KGP",
-    image: "/assets/Items/5.png",
+    image: "/assets/items/5.png",
     campus: "IIT Kharagpur",
   },
   {
@@ -59,7 +59,7 @@ export const products: Product[] = [
     price: 999,
     originalPrice: 1299,
     badge: "IIT KGP",
-    image: "/assets/Items/15.png",
+    image: "/assets/items/15.png",
     campus: "IIT Kharagpur",
   },
   {
@@ -68,7 +68,7 @@ export const products: Product[] = [
     price: 1599,
     originalPrice: 1999,
     badge: "IIT ROORKEE",
-    image: "/assets/Items/9.png",
+    image: "/assets/items/9.png",
     campus: "IIT Roorkee",
   },
   {
@@ -77,7 +77,7 @@ export const products: Product[] = [
     price: 849,
     originalPrice: 1099,
     badge: "IIT ROORKEE",
-    image: "/assets/Items/11.png",
+    image: "/assets/items/11.png",
     campus: "IIT Roorkee",
   },
   {
@@ -86,7 +86,7 @@ export const products: Product[] = [
     price: 1699,
     originalPrice: 2199,
     badge: "DHANBAD",
-    image: "/assets/Items/8.png",
+    image: "/assets/items/8.png",
     campus: "IIT (ISM) Dhanbad",
   },
   {
@@ -95,7 +95,7 @@ export const products: Product[] = [
     price: 1399,
     originalPrice: 1799,
     badge: "DHANBAD",
-    image: "/assets/Items/17.png",
+    image: "/assets/items/17.png",
     campus: "IIT (ISM) Dhanbad",
   },
   {
@@ -104,7 +104,7 @@ export const products: Product[] = [
     price: 899,
     originalPrice: 1199,
     badge: "IIT Guwahati",
-    image: "/assets/Items/1.png",
+    image: "/assets/items/1.png",
     campus: "IIT Guwahati",
   },
   {
@@ -113,7 +113,7 @@ export const products: Product[] = [
     price: 1299,
     originalPrice: 1699,
     badge: "IIT Guwahati",
-    image: "/assets/Items/2.png",
+    image: "/assets/items/2.png",
     campus: "IIT Guwahati",
   },
   {
@@ -122,7 +122,7 @@ export const products: Product[] = [
     price: 799,
     originalPrice: 999,
     badge: "BestSeller",
-    image: "/assets/Items/4.png",
+    image: "/assets/items/4.png",
     campus: "General",
   },
   {
@@ -131,7 +131,7 @@ export const products: Product[] = [
     price: 1499,
     originalPrice: 1899,
     badge: "IIT KGP",
-    image: "/assets/Items/6.png",
+    image: "/assets/items/6.png",
     campus: "IIT KGP",
   },
   {
@@ -140,7 +140,7 @@ export const products: Product[] = [
     price: 849,
     originalPrice: 1099,
     badge: "IIT GUWAHATI",
-    image: "/assets/Items/7.png",
+    image: "/assets/items/7.png",
     campus: "IIT Guwahati",
   },
   {
@@ -149,7 +149,7 @@ export const products: Product[] = [
     price: 1299,
     originalPrice: 1699,
     badge: "HYDERABAD",
-    image: "/assets/Items/10.png",
+    image: "/assets/items/10.png",
     campus: "IIT Hyderabad",
   },
   {
@@ -158,7 +158,7 @@ export const products: Product[] = [
     price: 799,
     originalPrice: 999,
     badge: "IIT Guwahati",
-    image: "/assets/Items/12.png",
+    image: "/assets/items/12.png",
     campus: "IIT Guwahati",
   },
   {
@@ -167,7 +167,7 @@ export const products: Product[] = [
     price: 1499,
     originalPrice: 1899,
     badge: "GLOBAL DROP",
-    image: "/assets/Items/13.png",
+    image: "/assets/items/13.png",
     campus: "General",
   },
   {
@@ -176,7 +176,7 @@ export const products: Product[] = [
     price: 899,
     originalPrice: 1199,
     badge: "LIMITED",
-    image: "/assets/Items/16.png",
+    image: "/assets/items/16.png",
     campus: "General",
   },
 ];
@@ -193,16 +193,38 @@ export function ProductCard({
   onToggleWishlist: (productId: string) => void;
 }) {
   const SIZES = ["S", "M", "L", "XL"];
+  const [imgSrc, setImgSrc] = useState(product.image);
+  const [errorStep, setErrorStep] = useState(0);
+
+  const handleImageError = () => {
+    if (errorStep === 0) {
+      setErrorStep(1);
+      setImgSrc(product.image.replace("/items/", "/Items/"));
+    } else if (errorStep === 1) {
+      setErrorStep(2);
+      const switchedExt = product.image.endsWith(".png")
+        ? product.image.replace(".png", ".jpg")
+        : product.image.replace(".jpg", ".png");
+      setImgSrc(switchedExt);
+    } else if (errorStep === 2) {
+      setErrorStep(3);
+      setImgSrc(
+        product.image
+          .replace("/items/", "/Items/")
+          .replace(".png", ".jpg")
+      );
+    } else {
+      setImgSrc("/assets/unora.jpg");
+    }
+  };
 
   return (
     <div className="product-card group">
       <div className="product-card__image relative overflow-hidden">
         <img
-          src={product.image}
+          src={imgSrc}
           alt={`${product.name} campaign`}
-          onError={(e) => {
-            e.currentTarget.src = "/assets/Items/1.png";
-          }}
+          onError={handleImageError}
         />
         <span className="badge">{product.badge}</span>
         <button
@@ -214,9 +236,6 @@ export function ProductCard({
         </button>
 
         <div className="quick-add flex flex-col items-center justify-center gap-1 px-2.5 py-2">
-          {/* <span className="text-[9px] font-black tracking-widest uppercase text-[#3C1A11]/60">
-            SELECT SIZE
-          </span> */}
           <div className="flex gap-1.5 w-full justify-center">
             {SIZES.map((sz) => (
               <button
