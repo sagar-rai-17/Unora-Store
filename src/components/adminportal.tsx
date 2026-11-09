@@ -4,7 +4,6 @@ import { signOut, onAuthStateChanged, type User } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { checkIsAdmin } from "../utils/adminCheck";
 import { convertGoogleDriveUrl } from "../utils/driveImage";
-import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 const CAMPUSES = [
   "ALL",
@@ -421,7 +420,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
       return matchesCampus && matchesStatus && matchesSearch;
     });
   }, [orders, selectedCampus, selectedStatusFilter, searchQuery]);
-  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   const isAuthorized = Boolean(currentUser && isAdminUser);
@@ -916,17 +914,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black uppercase mb-1">Audience Category</label>
-                    <select
-                      value={editingItem.category || "unisex"}
-                      onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
-                    >
-                      <option value="unisex">Unisex / Both</option>
-                      <option value="men">Men</option>
-                      <option value="women">Women</option>
-                    </select>
-                  </div>
+                  <label className="block text-[10px] font-black uppercase mb-1">Audience</label>
+                  <select
+                    value={newProdCategory}
+                    onChange={(e) => setNewProdCategory(e.target.value as any)}
+                    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] text-xs font-bold outline-none cursor-pointer"
+                  >
+                    <option value="unisex">Unisex / Both</option>
+                    <option value="men">Men</option>
+                    <option value="women">Women</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2 pt-2">
@@ -1031,7 +1029,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                   <button type="button" onClick={() => setEditingItem(null)} className="text-xs font-bold text-[#3C1A11]/60 hover:text-[#3C1A11]">Cancel</button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                   <div>
                     <label className="block text-[10px] font-black uppercase mb-1">Live Price (₹)</label>
                     <input
@@ -1071,6 +1069,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                     >
                       <option value="inStock">In Stock</option>
                       <option value="outOfStock">Out of Stock (Sold Out)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase mb-1">Audience</label>
+                    <select
+                      value={editingItem.category || "unisex"}
+                      onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+                    >
+                      <option value="unisex">Unisex / Both</option>
+                      <option value="men">Men</option>
+                      <option value="women">Women</option>
                     </select>
                   </div>
                 </div>
