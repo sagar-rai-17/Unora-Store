@@ -108,7 +108,7 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({
                       }}
                       className="px-3 py-1.5 bg-[#3C1A11] hover:bg-[#D94F27] text-[#BDF119] hover:text-[#FFE2C7] rounded-lg font-black text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
                     >
-                      Move to Bag (L) →
+                      Move to Bag →
                     </button>
                   </div>
                 </div>

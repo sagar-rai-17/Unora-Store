@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../firebaseConfig";
+import React from "react";
 
 export interface OrderRecord {
   id: string;
@@ -9,7 +7,7 @@ export interface OrderRecord {
   campusName: string;
   total: number;
   itemsCount: number;
-  status: "Received" | "Printing" | "Dispatched" | "Delivered" | "Processing";
+  status: "Received" | "In Transit" | "Delivered";
 }
 
 interface AccountPageProps {
@@ -29,57 +27,11 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   isOpen,
   onClose,
   user,
-  orders: propOrders = [],
+  orders = [],
   onLogout,
   onTrackOrder,
 }) => {
-  const [liveOrders, setLiveOrders] = useState<OrderRecord[]>([]);
-
-  useEffect(() => {
-    if (!isOpen || !auth.currentUser) return;
-
-    const q = query(
-      collection(db, "orders"),
-      where("userId", "==", auth.currentUser.uid)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const fetched: OrderRecord[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          let dateText = "Recent";
-          if (data.createdAt?.toDate) {
-            dateText = data.createdAt.toDate().toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            });
-          }
-          return {
-            id: data.orderId || docSnap.id,
-            date: dateText,
-            hostelName: data.hostelName || "Hostel",
-            campusName: data.campus || "IIT",
-            total: Number(data.grandTotal || 0),
-            itemsCount: Array.isArray(data.items)
-              ? data.items.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0)
-              : 0,
-            status: data.status || "Received",
-          };
-        });
-
-        setLiveOrders(fetched);
-      },
-      (error) => {
-        console.error(error);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [isOpen]);
-
-  const displayOrders = liveOrders.length > 0 ? liveOrders : propOrders;
+  const displayOrders = orders;
 
   if (!isOpen) return null;
 

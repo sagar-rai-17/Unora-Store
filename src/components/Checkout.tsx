@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { CartItem } from "./CartSidebar";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
+import emailjs from "@emailjs/browser";
 
 interface CheckoutProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const CAMPUSES = [
   "IIT BHU",
   "IIT Hyderabad",
   "IIT Gandhinagar",
+  "IIT (ISM) Dhanbad",
 ];
 
 export const Checkout: React.FC<CheckoutProps> = ({
@@ -37,7 +39,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
   const [hostelName, setHostelName] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"upi" | "cod">("upi");
+  const paymentMethod = "upi";
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,13 +50,13 @@ export const Checkout: React.FC<CheckoutProps> = ({
     0
   );
 
-  const customTotal = items.reduce(
-    (acc, item) => acc + (item.customFee || 0) * item.quantity,
+  const totalCustomFee = items.reduce(
+    (acc, item) => acc + (item.customFee || 0),
     0
   );
 
   const deliveryFee = items.length > 0 ? 40 : 0;
-  const grandTotal = Math.max(0, itemsTotal + customTotal + deliveryFee - appliedDiscount);
+  const grandTotal = Math.max(0, itemsTotal - appliedDiscount) + deliveryFee + totalCustomFee;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +82,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
     setIsSubmitting(true);
 
     try {
-      const generatedOrderId = `UNR-${Math.floor(100000 + Math.random() * 900000)}`;
+      const generatedOrderId = `UNR-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
 
       await addDoc(collection(db, "orders"), {
         userId: auth.currentUser?.uid || "guest",
@@ -92,19 +94,54 @@ export const Checkout: React.FC<CheckoutProps> = ({
         hostelName: hostelName.trim(),
         roomNumber: roomNumber.trim(),
         deliveryNote: deliveryNote.trim(),
-        paymentMethod,
+        paymentMethod: "upi",
         items: items.map((it) => ({
           name: it.name,
           size: it.size,
+          color: it.color || "",
+          style: it.style || "",
           quantity: it.quantity,
           basePrice: it.basePrice,
           customFee: it.customFee || 0,
           customText: it.customText || "",
         })),
-        grandTotal,
+        grandTotal: grandTotal,
         status: "Received",
         createdAt: serverTimestamp(),
       });
+
+      const itemsSummary = items
+        .map((it) => `${it.quantity}x ${it.name} [Size: ${it.size}]${it.customText ? ` (Print: "${it.customText}")` : ""} - ₹${it.basePrice + (it.customFee || 0)}`)
+        .join("\n");
+
+      try {
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+        const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+        if (serviceId && templateId && publicKey) {
+          await emailjs.send(
+            serviceId,
+            templateId,
+            {
+              order_id: generatedOrderId,
+              customer_name: fullName.trim(),
+              customer_phone: mobile.trim(),
+              to_email: auth.currentUser?.email || "",
+              campus: selectedCampus,
+              hostel_name: hostelName.trim(),
+              room_number: roomNumber.trim(),
+              delivery_note: deliveryNote.trim() || "None",
+              items_summary: itemsSummary,
+              grand_total: grandTotal,
+              payment_status: "Paid Online (UPI)",
+            },
+            publicKey
+          );
+        }
+      } catch (emailErr) {
+        console.error(emailErr);
+      }
 
       setIsSubmitting(false);
       onOrderSuccess(generatedOrderId, hostelName, selectedCampus);
@@ -259,29 +296,9 @@ export const Checkout: React.FC<CheckoutProps> = ({
                 <span className="block text-xs font-black tracking-wider uppercase mb-2">
                   Payment Method
                 </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("upi")}
-                    className={`h-12 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                      paymentMethod === "upi"
-                        ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
-                        : "border-[#3C1A11]/30 text-[#3C1A11] hover:border-[#3C1A11]"
-                    }`}
-                  >
-                    UPI / QR Code
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("cod")}
-                    className={`h-12 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                      paymentMethod === "cod"
-                        ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
-                        : "border-[#3C1A11]/30 text-[#3C1A11] hover:border-[#3C1A11]"
-                    }`}
-                  >
-                    Cash On Delivery
-                  </button>
+                <div className="h-12 rounded-xl border-2 border-[#3C1A11] bg-[#3C1A11] text-[#BDF119] flex items-center justify-between px-4 font-black text-xs uppercase tracking-wider">
+                  <span>Online Payment / UPI</span>
+                  <span className="bg-[#BDF119] text-[#3C1A11] text-[9px] px-2 py-0.5 rounded font-black">Prepaid Only</span>
                 </div>
               </div>
             </form>
@@ -326,12 +343,8 @@ export const Checkout: React.FC<CheckoutProps> = ({
 
               <div className="space-y-2 text-xs font-bold text-[#3C1A11]/80">
                 <div className="flex justify-between">
-                  <span>Items Total</span>
+                  <span>Items Subtotal</span>
                   <span>₹{itemsTotal.toLocaleString("en-IN")}.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Customization Total</span>
-                  <span>₹{customTotal.toLocaleString("en-IN")}.00</span>
                 </div>
 
                 {appliedDiscount > 0 && (
@@ -341,16 +354,15 @@ export const Checkout: React.FC<CheckoutProps> = ({
                   </div>
                 )}
 
-                <div className="flex justify-between">
-                  <span>Delivery Fee</span>
-                  <span>₹{deliveryFee.toLocaleString("en-IN")}.00</span>
-                </div>
                 <div className="flex justify-between items-baseline pt-3 border-t-2 border-[#3C1A11] text-base font-anton text-[#3C1A11]">
-                  <span>GRAND TOTAL</span>
+                  <span>TOTAL PAYABLE</span>
                   <span className="text-2xl text-[#D94F27]">
                     ₹{grandTotal.toLocaleString("en-IN")}.00
                   </span>
                 </div>
+                <p className="text-[10px] text-[#3C1A11]/50 font-bold tracking-wide">
+                  Includes hostel courier routing and all applicable fulfillment fees.
+                </p>
               </div>
 
               <button

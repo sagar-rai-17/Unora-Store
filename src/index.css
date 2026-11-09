@@ -1,6 +1,17 @@
 @import url("https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
+@theme {
+  --color-unora-brown: #3c1a11;
+  --color-unora-orange: #d94f27;
+  --color-unora-cream: #ffe2c7;
+  --color-unora-tangerine: #f47e20;
+  --color-unora-lime: #bdf119;
+  --color-unora-blue: #2952cc;
+  --font-anton: "Anton", sans-serif;
+  --font-dmsans: "DM Sans", sans-serif;
+}
+
 :root {
   --brown: #3c1a11;
   --orange: #d94f27;
@@ -18,45 +29,47 @@
   font-synthesis: none;
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-html {
-  scroll-behavior: smooth;
-}
+  html {
+    scroll-behavior: smooth;
+  }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  background: var(--cream);
-}
+  body {
+    margin: 0;
+    min-width: 320px;
+    background: var(--cream);
+  }
 
-button, input {
-  font: inherit;
-}
+  button, input {
+    font: inherit;
+  }
 
-button, a {
-  -webkit-tap-highlight-color: transparent;
-}
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
 
-button {
-  color: inherit;
-}
+  button {
+    color: inherit;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-img {
-  display: block;
-  max-width: 100%;
-}
+  img {
+    display: block;
+    max-width: 100%;
+  }
 
-:focus-visible {
-  outline: 3px solid var(--blue);
-  outline-offset: 3px;
+  :focus-visible {
+    outline: 3px solid var(--blue);
+    outline-offset: 3px;
+  }
 }
 
 .site-header {

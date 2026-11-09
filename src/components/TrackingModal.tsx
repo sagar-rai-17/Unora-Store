@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
+import { checkIsAdmin } from "../utils/adminCheck";
 
 export const UNIFIED_STATUSES = [
   "Received",
-  "Printing",
   "In Transit",
-  "At Hostel Gate",
   "Delivered",
 ] as const;
-
 export type UnifiedStatus = (typeof UNIFIED_STATUSES)[number];
 
 interface TrackingModalProps {
@@ -31,27 +29,68 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
     status: UnifiedStatus;
     items: Array<{ name: string; size: string; customText?: string }>;
   } | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!isOpen || !orderId) return;
+    if (!isOpen || !orderId) {
+      setOrderData(null);
+      setNotFound(false);
+      return;
+    }
 
-    const q = query(collection(db, "orders"), where("orderId", "==", orderId));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const docSnap = snapshot.docs[0];
-        const data = docSnap.data();
-        setOrderData({
-          orderId: data.orderId || docSnap.id,
-          campus: data.campus || "IIT Campus",
-          hostelName: data.hostelName || "Hostel",
-          roomNumber: data.roomNumber || "",
-          status: (data.status as UnifiedStatus) || "Received",
-          items: Array.isArray(data.items) ? data.items : [],
-        });
+    setNotFound(false);
+    let unsubscribe: (() => void) | null = null;
+
+    const executeTracking = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setOrderData(null);
+        setNotFound(true);
+        return;
       }
-    });
 
-    return () => unsubscribe();
+      const isAdmin = await checkIsAdmin(user.uid);
+
+      const q = isAdmin
+        ? query(collection(db, "orders"), where("orderId", "==", orderId))
+        : query(
+            collection(db, "orders"),
+            where("orderId", "==", orderId),
+            where("userId", "==", user.uid)
+          );
+
+      unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const docSnap = snapshot.docs[0];
+            const data = docSnap.data();
+            setOrderData({
+              orderId: data.orderId || docSnap.id,
+              campus: data.campus || "IIT Campus",
+              hostelName: data.hostelName || "Hostel",
+              roomNumber: data.roomNumber || "",
+              status: (data.status as UnifiedStatus) || "Received",
+              items: Array.isArray(data.items) ? data.items : [],
+            });
+            setNotFound(false);
+          } else {
+            setOrderData(null);
+            setNotFound(true);
+          }
+        },
+        () => {
+          setOrderData(null);
+          setNotFound(true);
+        }
+      );
+    };
+
+    executeTracking();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [isOpen, orderId]);
 
   if (!isOpen || !orderId) return null;
@@ -65,17 +104,13 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
   const getStatusMessage = (status: UnifiedStatus, campus: string, hostel: string) => {
     switch (status) {
       case "Received":
-        return `Order received ready for dispatch to ${campus}`;
-      case "Printing":
-        return "Your customized items are getting printed at Unora Studio.";
+        return `Order received and confirmed for dispatch to ${campus}.`;
       case "In Transit":
-        return `Dispatched from the hub. Courier is routed to ${campus}.`;
-      case "At Hostel Gate":
-        return `Your package has arrived at the ${campus} and is on the way to ${hostel}.`;
+        return `Package is in transit and routed to ${hostel} (${campus}).`;
       case "Delivered":
-        return `Package handed over at ${hostel}. Enjoy your campus fit!`;
+        return `Package delivered at ${hostel}. Enjoy your campus fit!`;
       default:
-        return "Order is being processed by us.";
+        return "Order is being processed.";
     }
   };
 
@@ -83,6 +118,7 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
     <div className="fixed inset-0 z-140 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg bg-[#FFF8F0] border-2 border-[#3C1A11] rounded-3xl p-6 md:p-8 shadow-2xl text-[#3C1A11]">
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-full border border-[#3C1A11]/20 hover:bg-[#3C1A11] hover:text-[#FFE2C7] transition-colors cursor-pointer"
           aria-label="Close"
@@ -103,7 +139,7 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
             CAMPUS DISPATCH TRACKER
           </h2>
           <p className="text-xs font-bold text-[#3C1A11]/60 mt-0.5">
-            Destination: {orderData ? `${orderData.hostelName} (${orderData.campus})` : "Verifying..."}
+            Destination: {orderData ? `${orderData.hostelName} (${orderData.campus})` : notFound ? "Order Not Found" : "Verifying..."}
           </p>
         </div>
 
@@ -112,7 +148,9 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
             LIVE DISPATCH STATUS
           </span>
           <p className="font-bold text-xs text-[#3C1A11] mt-1">
-            {orderData
+            {notFound
+              ? "Order not found. Please verify your reference code or contact support."
+              : orderData
               ? getStatusMessage(orderData.status, orderData.campus, orderData.hostelName)
               : "Connecting to campus logistics node..."}
           </p>
@@ -122,7 +160,6 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
           {UNIFIED_STATUSES.map((step, idx) => {
             const isCompleted = idx < currentStatusIndex;
             const isCurrent = idx === currentStatusIndex;
-            const isPending = idx > currentStatusIndex;
 
             return (
               <div key={step} className="flex items-start gap-4 relative">

@@ -59,7 +59,7 @@ export const SocialProof: React.FC = () => {
         </div>
       </section>
 
-      <section className="reviews-section">
+      <section className="reviews-section" id="reviews">
         <div className="section-heading">
           <div>
             <span className="eyebrow eyebrow--dark">CAMPUS APPROVED</span>
@@ -106,7 +106,7 @@ export const SocialProof: React.FC = () => {
         </div>
       </section>
 
-      <section className="section faq">
+      <section className="section faq" id="faq">
         <div className="section-heading">
           <div>
             <span className="eyebrow eyebrow--dark">NEED TO KNOW</span>

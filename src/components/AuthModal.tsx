@@ -19,6 +19,8 @@ interface AuthModalProps {
   onRegisterSuccess: (name: string) => void;
 }
 
+
+
 const CAMPUS_OPTIONS = [
   "IIT BHU",
   "IIT Kharagpur",
@@ -72,6 +74,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [iitCampus, setIitCampus] = useState(CAMPUS_OPTIONS[0]);
 
   useEffect(() => {
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     setErrors({});
   }, [mode, loginMethod]);
 
@@ -85,6 +96,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     return () => clearInterval(interval);
   }, [otpSent, otpTimer]);
 
+  useEffect(() => {
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
+
   if (!isOpen) return null;
 
   const initRecaptcha = () => {
@@ -97,6 +117,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const mapAuthError = (errorCode: string): string => {
     switch (errorCode) {
+      case "auth/billing-not-enabled":
+        return "SMS service is temporarily undergoing scheduled maintenance. Please sign in with Email or Google.";
+      case "auth/quota-exceeded":
+        return "SMS limit reached for today. Please try again tomorrow or sign in with Google/Email.";
       case "auth/email-already-in-use":
         return "An account with this email already exists.";
       case "auth/invalid-email":
@@ -337,47 +361,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleFinalizeVerifiedRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
-    const code = otp.join("");
-    if (code.length !== 6) {
-      setErrors({ otp: "Enter the complete 6-digit code." });
-      return;
-    }
-    if (!confirmationResult) {
-      setErrors({ otp: "Verification session expired." });
-      return;
-    }
+    if (!confirmationResult) return;
 
     setErrors({});
     setIsLoading(true);
 
     try {
-      await confirmationResult.confirm(code);
-
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        regEmail.trim(),
-        regPassword
-      );
-
+      const userCredential = await confirmationResult.confirm(otp.join(""));
       const uid = userCredential.user.uid;
-      const birthdate = `${dobDay}-${dobMonth}-${dobYear}`;
 
       await setDoc(doc(db, "users", uid), {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: regEmail.trim(),
-        birthdate,
-        gender,
+        birthdate: `${dobDay}-${dobMonth}-${dobYear}`,
+        gender: gender,
         mobile: regMobile.trim(),
-        iitCampus,
+        iitCampus: iitCampus,
+        cart: [],
         createdAt: new Date().toISOString(),
       });
 
-      const fullName = `${firstName.trim()} ${lastName.trim()}`;
-      onRegisterSuccess(fullName);
+      onRegisterSuccess(`${firstName} ${lastName}`);
       onClose();
     } catch (err: any) {
-      setErrors({ form: mapAuthError(err.code) });
+      setErrors({ form: "Registration failed. Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -436,13 +444,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-lg my-auto bg-[#FFF8F0] border-2 border-[#3C1A11] rounded-2xl p-5 sm:p-8 shadow-2xl text-[#3C1A11] max-h-[92vh] flex flex-col">
         <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full border border-[#3C1A11]/20 hover:bg-[#3C1A11] hover:text-[#FFE2C7] transition-colors z-20 cursor-pointer"
-          aria-label="Close"
-        >
+          onClick={async () => {
+            if (recaptchaVerifierRef.current) {
+              recaptchaVerifierRef.current.clear();
+              recaptchaVerifierRef.current = null;
+            }
+            if (mode === "onboarding" || mode === "verify-phone") {
+              await auth.signOut();
+            }
+            onClose();
+          }}
+  className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full border border-[#3C1A11]/20 hover:bg-[#3C1A11] hover:text-[#FFE2C7] transition-colors z-20 cursor-pointer"
+  aria-label="Close"
+>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

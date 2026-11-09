@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebaseConfig";
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import emailjs from "@emailjs/browser";
 
 import { Navbar } from "./components/Navbar";
 import { Hero } from "./components/Hero";
@@ -20,6 +21,11 @@ import { AdminPortal } from "./components/adminportal";
 import { TrackingModal } from "./components/TrackingModal";
 import { WishlistDrawer } from "./components/WishlistDrawer";
 import { products } from "./components/Catalog";
+import { checkIsAdmin } from "./utils/adminCheck";
+import { ProductDetailPage } from "./components/ProductDetailPage";
+import { StaticInfoModal, type StaticInfoType } from "./components/StaticInfoModal";
+import { AboutUsModal } from "./components/AboutUsModal";
+import { FeedbackModal } from "./components/FeedbackModal";
 
 export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
@@ -31,17 +37,7 @@ export default function App() {
         return []
       }
     }
-    return [
-      {
-        id: "init-1",
-        name: "Varsity '58 Heavyweight Tee",
-        basePrice: 899,
-        size: "L",
-        campus: "IIT BOMBAY",
-        image: "https://images.unsplash.com/photo-1577372570570-fe08f7adc27b?auto=format&fit=crop&w=700&q=85",
-        quantity: 1,
-      },
-    ]
+    return []
   })
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -53,16 +49,28 @@ export default function App() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [wishlistItems, setWishlistItems] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [inventoryProducts, setInventoryProducts] = useState<Product[]>([]);
+  const [selectedDetailProduct, setSelectedDetailProduct] = useState<Product | null>(null);
+  const [studioProduct, setStudioProduct] = useState<Product | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "men" | "women">("all");
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [staticInfoType, setStaticInfoType] = useState<StaticInfoType | null>(null);
 
   useEffect(() => {
     const unsubInv = onSnapshot(collection(db, "inventory"), (snap) => {
-      if (snap.empty) return;
+      const liveProducts = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Product[];
+
+      if (liveProducts.length > 0) {
+        setInventoryProducts(liveProducts);
+      }
+
       const livePriceMap: Record<string, number> = {};
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        if (data.name && typeof data.price === "number") {
-          livePriceMap[data.name] = data.price;
-        }
+      liveProducts.forEach((p) => {
+        livePriceMap[p.name] = p.price;
       });
 
       setCartItems((prevItems) =>
@@ -107,80 +115,48 @@ export default function App() {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsLoggedIn(true);
-        const email = user.email || "";
-        setUserEmail(email);
-
-        setIsAdmin(
-          email.toLowerCase() === "admin@unoracloth.in" ||
-          email.toLowerCase() === "admin@unora.in" ||
-          email.toLowerCase().endsWith("@unora.in")
-        );
-
-        let resolvedName = user.displayName || "";
+        setUserEmail(user.email || "");
 
         try {
+          const adminStatus = await checkIsAdmin(user.uid);
+          setIsAdmin(adminStatus);
+
           const userDoc = await getDoc(doc(db, "users", user.uid));
+          let finalName = "";
+
           if (userDoc.exists()) {
-            const cloudCart = userDoc.data().cart;
-            if (Array.isArray(cloudCart) && cloudCart.length > 0) {
-              setCartItems((prevGuestCart) => {
-                const merged = [...cloudCart];
-                prevGuestCart.forEach((guestItem) => {
-                  const exists = merged.some(
-                    (c) => c.name === guestItem.name && c.size === guestItem.size
-                  );
-                  if (!exists) {
-                    merged.push(guestItem);
-                  }
-                });
-                return merged;
-              });
+            const data = userDoc.data();
+            finalName = ((data.firstName || "") + " " + (data.lastName || "")).trim();
+            
+            if (Array.isArray(data.cart)) {
+              setCartItems(data.cart);
             }
           }
+          
+          if (!finalName) {
+            finalName = user.displayName || (user.email ? user.email.split("@")[0] : "") || "Campus Member";
+          }
+
+          setUserName(finalName);
+          setUserInitials(computeInitials(finalName));
         } catch (err) {
-          console.error(err);
+          console.error("Auth sync error:", err);
         }
 
-        const finalName = resolvedName || email.split("@")[0] || "Campus Member";
-        setUserName(finalName);
-        setUserInitials(computeInitials(finalName));
-        setAuthResolved(true);
-
         const wishlistQuery = collection(db, "users", user.uid, "wishlist");
-        const unsubscribeWishlist = onSnapshot(wishlistQuery, (snapshot) => {
-          const ids = snapshot.docs.map((docSnap) => docSnap.id);
-          setWishlistItems(ids);
-        });
+        const unsubscribeWishlist = onSnapshot(wishlistQuery, (snap) => setWishlistItems(snap.docs.map(d => d.id)));
 
-        const ordersQuery = query(
-          collection(db, "orders"),
-          where("userId", "==", user.uid)
-        );
-
-        unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
-          const liveOrders: OrderRecord[] = snapshot.docs.map((docSnap) => {
-            const data = docSnap.data();
-            let dateText = "Recent";
-            if (data.createdAt?.toDate) {
-              dateText = data.createdAt.toDate().toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              });
-            }
-            return {
-              id: data.orderId || docSnap.id,
-              date: dateText,
-              hostelName: data.hostelName || "Hostel",
-              campusName: data.campus || "IIT",
-              total: Number(data.grandTotal || 0),
-              itemsCount: Array.isArray(data.items)
-                ? data.items.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0)
-                : 0,
-              status: data.status || "Received",
-            };
-          });
-          setOrders(liveOrders);
+        const ordersQuery = query(collection(db, "orders"), where("userId", "==", user.uid));
+        unsubscribeOrders = onSnapshot(ordersQuery, (snap) => {
+          setOrders(snap.docs.map(d => ({ 
+            id: d.data().orderId || d.id,
+            date: d.data().createdAt?.toDate?.().toLocaleDateString("en-IN") || "Recent",
+            hostelName: d.data().hostelName || "Hostel",
+            campusName: d.data().campus || "IIT",
+            total: Number(d.data().grandTotal || 0),
+            itemsCount: d.data().items?.reduce((a: number, i: any) => a + (i.quantity || 1), 0) || 0,
+            status: d.data().status || "Received"
+          })));
         });
       } else {
         setIsLoggedIn(false);
@@ -190,12 +166,9 @@ export default function App() {
         setIsAdmin(false);
         setOrders([]);
         setWishlistItems([]);
-        setAuthResolved(true);
-        if (unsubscribeOrders) {
-          unsubscribeOrders();
-          unsubscribeOrders = null;
-        }
+        if (unsubscribeOrders) unsubscribeOrders();
       }
+      setAuthResolved(true);
     });
 
     return () => {
@@ -238,7 +211,7 @@ export default function App() {
     setActiveCoupon(code)
   }
   const handleAddCatalogProduct = (product: Product, size: string = "L") => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !auth.currentUser) {
       setToastMessage("Please Sign In to start your campus collection.");
       setToast(true);
       setIsAuthOpen(true);
@@ -246,8 +219,16 @@ export default function App() {
       return;
     }
 
+    const liveProduct = inventoryProducts.find((p) => p.id === product.id) || product;
+    if (liveProduct.inStock === false) {
+      setToastMessage("This item is currently out of stock.");
+      setToast(true);
+      window.setTimeout(() => setToast(false), 2500);
+      return;
+    }
+
     const existingIndex = cartItems.findIndex(
-      (item) => item.name === product.name && item.size === size
+      (item) => item.id.toString().includes(product.id) && item.size === size
     );
 
     if (existingIndex > -1) {
@@ -255,23 +236,23 @@ export default function App() {
         prev.map((item, idx) =>
           idx === existingIndex ? { ...item, quantity: item.quantity + 1 } : item
         )
-      )
+      );
     } else {
       const newItem: CartItem = {
-        id: `cat-${product.id}-${Date.now()}`,
+        id: `${product.id}-${size}-${Date.now()}`,
         name: product.name,
         basePrice: product.price,
         size: size,
         campus: product.campus,
         image: product.image,
         quantity: 1,
-      }
-      setCartItems((prev) => [...prev, newItem])
+      };
+      setCartItems((prev) => [...prev, newItem]);
     }
-    setToastMessage(`Added ${product.name} (${size}) to Bag`)
-    setToast(true)
-    window.setTimeout(() => setToast(false), 2200)
-  }
+    setToastMessage(`Added ${product.name} (${size}) to Bag`);
+    setToast(true);
+    window.setTimeout(() => setToast(false), 2200);
+  };
 
   const handleAddStudioProduct = (customItem: {
     name: string;
@@ -279,14 +260,28 @@ export default function App() {
     customFee: number;
     customText: string;
     size: string;
+    image?: string;
+    campus?: string;
+    color?: string;
+    style?: string;
     quantity: number;
   }) => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !auth.currentUser) {
       setToastMessage("Please Sign In to start your campus collection.");
       setToast(true);
       setIsAuthOpen(true);
       window.setTimeout(() => setToast(false), 3000);
       return;
+    }
+
+    if (studioProduct) {
+      const liveProduct = inventoryProducts.find((p) => p.id === studioProduct.id) || studioProduct;
+      if (liveProduct.inStock === false) {
+        setToastMessage("The base garment is currently out of stock.");
+        setToast(true);
+        window.setTimeout(() => setToast(false), 2500);
+        return;
+      }
     }
 
     const newItem: CartItem = {
@@ -296,15 +291,17 @@ export default function App() {
       customFee: customItem.customFee,
       customText: customItem.customText,
       size: customItem.size,
-      campus: "STUDIO LAB",
-      image: "https://images.unsplash.com/photo-1652873575482-f33a4d7c7423?auto=format&fit=crop&w=700&q=85",
+      color: customItem.color,
+      style: customItem.style,
+      campus: customItem.campus || "CAMPUS SPECIAL",
+      image: customItem.image || "/assets/unora.jpg",
       quantity: customItem.quantity,
-    }
-    setCartItems((prev) => [...prev, newItem])
-    setToastMessage(`Added Custom Hoodie (${customItem.size}) with "${customItem.customText}" to Bag`)
-    setToast(true)
-    window.setTimeout(() => setToast(false), 2200)
-  }
+    };
+    setCartItems((prev) => [...prev, newItem]);
+    setToastMessage(`Added ${customItem.name} to Bag`);
+    setToast(true);
+    window.setTimeout(() => setToast(false), 2200);
+  };
 
   const handleUpdateQuantity = (id: string | number, delta: number) => {
     setCartItems((prev) =>
@@ -332,12 +329,13 @@ export default function App() {
   }
 
   const computeInitials = (name: string) => {
-    const parts = name.trim().split(" ")
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    if (!name) return "UN";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2 && parts[0][0] && parts[1][0]) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return name.slice(0, 2).toUpperCase()
-  }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   const handleLoginSuccess = (name: string) => {
     setToastMessage(`Welcome back, ${name}!`);
@@ -354,6 +352,8 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await auth.signOut();
+      setCartItems([]);
+      localStorage.removeItem("unora_cart");
       setToastMessage("Logged out successfully.");
       setToast(true);
       window.setTimeout(() => setToast(false), 2500);
@@ -362,13 +362,50 @@ export default function App() {
     }
   };
 
+  const handleAddToCartFromDetail = (product: Product, size: string, fit: string, customPrice: number) => {
+    if (!isLoggedIn || !auth.currentUser) {
+      setToastMessage("Please Sign In to start your campus collection.");
+      setToast(true);
+      setIsAuthOpen(true);
+      window.setTimeout(() => setToast(false), 3000);
+      return;
+    }
+
+    const liveProduct = inventoryProducts.find((p) => p.id === product.id) || product;
+    if (liveProduct.inStock === false) {
+      setToastMessage("This item is currently out of stock.");
+      setToast(true);
+      window.setTimeout(() => setToast(false), 2500);
+      return;
+    }
+
+    const newItem: CartItem = {
+      id: `${product.id}-${size}-${fit}-${Date.now()}`,
+      name: `${product.name} (${fit})`,
+      basePrice: customPrice,
+      size,
+      campus: product.campus,
+      image: product.image,
+      quantity: 1,
+    };
+
+    setCartItems((prev) => [...prev, newItem]);
+    setSelectedDetailProduct(null);
+    setToastMessage(`Added ${product.name} to Bag`);
+    setToast(true);
+    window.setTimeout(() => setToast(false), 2200);
+  };
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  const handlePreloaderComplete = useCallback(() => {
+    setLoading(false);
+  }, []);
   return (
     <>
-      {loading && <Preloader onComplete={() => setLoading(false)} />}
+      {loading && <Preloader onComplete={handlePreloaderComplete} />}
 
       <div className={loading ? "hidden" : "block"}>
         <Navbar
@@ -379,6 +416,12 @@ export default function App() {
           userInitials={userInitials}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          onSelectNavCategory={(cat) => {
+            if (cat === "men") setSelectedCategory("men");
+            else if (cat === "women") setSelectedCategory("women");
+            else if (cat === "new-drops") setSelectedCategory("all");
+            else if (cat === "about-us") setIsAboutOpen(true);
+          }}
           onOpenAuth={() => setIsAuthOpen(true)}
           onOpenCart={() => setIsCartOpen(true)}
           onOpenAccount={() => setIsAccountOpen(true)}
@@ -387,27 +430,75 @@ export default function App() {
         />
         <Hero />
         <Catalog
-          onAddToCart={(product, size) => handleAddCatalogProduct(product, size)}
+          products={inventoryProducts}
+          onOpenDetail={(product) => setSelectedDetailProduct(product)}
           wishlistItems={wishlistItems}
           onToggleWishlist={handleToggleWishlist}
           searchQuery={searchQuery}
           onClearSearch={(term) => setSearchQuery(term || "")}
+          selectedCategory={selectedCategory}
         />
+
+        <ProductDetailPage
+          product={selectedDetailProduct}
+          isOpen={!!selectedDetailProduct}
+          onClose={() => setSelectedDetailProduct(null)}
+          onAddToCart={handleAddToCartFromDetail}
+          onToggleWishlist={handleToggleWishlist}
+          isWishlisted={selectedDetailProduct ? wishlistItems.includes(selectedDetailProduct.id) : false}
+          onLaunchStudio={(prod) => {
+            setSelectedDetailProduct(null);
+            setStudioProduct(prod);
+          }}
+        />
+
         <UnoraStudio
-          onAddToBag={(itemName, qty, singlePrice, customText) =>
+          isOpen={!!studioProduct}
+          onClose={() => setStudioProduct(null)}
+          baseProduct={studioProduct}
+          onAddToBag={(item) => {
             handleAddStudioProduct({
-              name: itemName,
-              basePrice: 1499,
-              customFee: 299,
-              customText: customText,
-              size: "L",
-              quantity: qty,
-            })
-          }
+              name: item.name,
+              basePrice: item.basePrice,
+              customFee: item.customFee,
+              customText: item.customText,
+              size: item.size,
+              quantity: item.quantity,
+              image: studioProduct?.image || "/assets/unora.jpg",
+              campus: studioProduct?.campus || "CAMPUS SPECIAL",
+              color: "Default",
+              style: "Custom",
+            });
+            setStudioProduct(null);
+          }}
         />
         <Reels />
         <SocialProof />
-        <Footer />
+        <Footer
+          onOpenAccount={() => {
+            if (!isLoggedIn) {
+              setToastMessage("Please Sign In to access your account.");
+              setToast(true);
+              setIsAuthOpen(true);
+              window.setTimeout(() => setToast(false), 3000);
+              return;
+            }
+            setIsAccountOpen(true);
+          }}
+          onOpenAbout={() => setIsAboutOpen(true)}
+          onOpenStaticInfo={(type) => setStaticInfoType(type)}
+          onTriggerToast={(msg) => {
+            setToastMessage(msg);
+            setToast(true);
+            window.setTimeout(() => setToast(false), 3000);
+          }}
+        />
+
+        <StaticInfoModal
+          isOpen={!!staticInfoType}
+          type={staticInfoType}
+          onClose={() => setStaticInfoType(null)}
+        />
         <AdminPortal
   isOpen={isAdminOpen}
   onClose={() => setIsAdminOpen(false)}
@@ -493,6 +584,20 @@ export default function App() {
           isOpen={!!trackingOrderId}
           onClose={() => setTrackingOrderId(null)}
           orderId={trackingOrderId}
+        />
+        <AboutUsModal
+          isOpen={isAboutOpen}
+          onClose={() => setIsAboutOpen(false)}
+          onOpenFeedback={() => {
+            setIsAboutOpen(false);
+            setIsFeedbackOpen(true);
+          }}
+        />
+
+        <FeedbackModal
+          isOpen={isFeedbackOpen}
+          onClose={() => setIsFeedbackOpen(false)}
+          defaultName={userName}
         />
 
         {toast && (

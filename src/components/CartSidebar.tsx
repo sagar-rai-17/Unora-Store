@@ -1,4 +1,6 @@
 import React from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 
 export interface CartItem {
   id: string | number;
@@ -6,6 +8,8 @@ export interface CartItem {
   basePrice: number;
   customFee?: number;
   size: string;
+  color?: string;
+  style?: string;
   campus: string;
   image: string;
   quantity: number;
@@ -38,57 +42,67 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   const [couponInput, setCouponInput] = React.useState("");
   const [couponError, setCouponError] = React.useState<string | null>(null);
 
-  const deliveryFee = items.length > 0 ? 40 : 0;
   const subtotal = items.reduce((acc, item) => {
-    return acc + (item.basePrice + (item.customFee || 0)) * item.quantity;
+    return acc + item.basePrice * item.quantity;
   }, 0);
+
+  const totalCustomizationFee = items.reduce((acc, item) => {
+    return acc + (item.customFee || 0);
+  }, 0);
+
+
+ 
+
+  const [activeSystemCoupon, setActiveSystemCoupon] = React.useState<{ code: string; active: boolean } | null>(null);
+
+  
+  const [buy4get1Active, setBuy4get1Active] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    const unsubOffers = onSnapshot(doc(db, "settings", "offers"), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setBuy4get1Active(d.buy4get1Enabled === true);
+      } else {
+        setBuy4get1Active(false);
+      }
+    });
+    return () => unsubOffers();
+  }, []);
 
   const totalQuantity = items.reduce((acc, item) => acc + item.quantity, 0);
 
   const cheapestUnitPrice = items.length > 0
-    ? Math.min(...items.map((item) => item.basePrice + (item.customFee || 0)))
+    ? Math.min(...items.map((item) => item.basePrice))
     : 0;
 
-  const autoOfferDiscount = totalQuantity >= 5 ? cheapestUnitPrice : 0;
-
-  const calculateDiscount = (code: string | null) => {
-    let promo = 0;
-    if (code === "UNORA20" || code === "CAMPUS20") {
-      promo = Math.round((subtotal - autoOfferDiscount) * 0.2);
-    }
-    return autoOfferDiscount + promo;
-  };
-
-  React.useEffect(() => {
-    if (items.length === 0) {
-      if (appliedDiscount > 0) onApplyDiscount(0, null);
-      return;
-    }
-    const updatedDiscount = calculateDiscount(activeCoupon);
-    if (updatedDiscount !== appliedDiscount) {
-      onApplyDiscount(updatedDiscount, activeCoupon);
-    }
-  }, [subtotal, totalQuantity, activeCoupon]);
+  const autoOfferDiscount = (buy4get1Active && totalQuantity >= 5) ? cheapestUnitPrice : 0;
+  const finalTotal = Math.max(0, subtotal - appliedDiscount) + totalCustomizationFee;
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = couponInput.trim().toUpperCase();
-    if (cleanCode === "UNORA20" || cleanCode === "CAMPUS20") {
-      const discount = calculateDiscount(cleanCode);
-      onApplyDiscount(discount, cleanCode);
-      setCouponError(null);
-      setCouponInput("");
-    } else {
-      setCouponError("Invalid code. Use UNORA20 or CAMPUS20.");
+
+    if (!activeSystemCoupon || !activeSystemCoupon.active) {
+      setCouponError("No active promotions at this time.");
+      return;
     }
+
+    if (cleanCode !== activeSystemCoupon.code) {
+      setCouponError(`Invalid code. Enter a valid campus code.`);
+      return;
+    }
+
+    const discount = Math.round((subtotal - autoOfferDiscount) * 0.2) + autoOfferDiscount;
+    onApplyDiscount(discount, cleanCode);
+    setCouponError(null);
+    setCouponInput("");
   };
 
   const handleRemoveCoupon = () => {
     onApplyDiscount(autoOfferDiscount, null);
     setCouponError(null);
   };
-
-  const finalTotal = Math.max(0, subtotal - appliedDiscount) + deliveryFee;
 
   if (!isOpen) return null;
 
@@ -122,6 +136,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
             </svg>
           </button>
         </div>
+
+        {buy4get1Active && totalQuantity >= 5 && (
+                <div className="flex items-center justify-between bg-[#3C1A11] text-[#BDF119] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                  <span>BUY 4 GET 1 FREE APPLIED</span>
+                  <span>-₹{autoOfferDiscount.toLocaleString("en-IN")}.00</span>
+                </div>
+              )}
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {items.length === 0 ? (
@@ -249,7 +270,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                       setCouponInput(e.target.value);
                       setCouponError(null);
                     }}
-                    placeholder="Apply Coupon (e.g. UNORA20)"
+                    placeholder="Apply Coupon"
                     className="flex-1 h-9 px-3 rounded-lg border border-[#3C1A11]/30 bg-transparent text-xs font-bold uppercase tracking-wider focus:border-[#2952CC] outline-none"
                   />
                   <button
@@ -271,7 +292,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 
           <div className="space-y-1.5 text-xs font-semibold text-[#3C1A11]/80">
             <div className="flex justify-between">
-              <span>Subtotal</span>
+              <span>Items Subtotal</span>
               <span>₹{subtotal.toLocaleString("en-IN")}.00</span>
             </div>
 
@@ -282,15 +303,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
               </div>
             )}
 
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>₹{deliveryFee.toLocaleString("en-IN")}.00</span>
-            </div>
-
             <div className="flex justify-between text-base font-anton text-[#3C1A11] pt-2 border-t border-[#3C1A11]/15">
-              <span>TOTAL</span>
+              <span>SUBTOTAL (BAG)</span>
               <span className="text-[#D94F27]">₹{finalTotal.toLocaleString("en-IN")}.00</span>
             </div>
+            <p className="text-[10px] text-[#3C1A11]/50 font-bold tracking-wide">
+              Final total including delivery & applicable charges will be calculated at checkout
+            </p>
           </div>
 
           <button
@@ -301,7 +320,6 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
             PROCEED TO BUY
           </button>
         </div>
-
       </div>
     </div>
   );

@@ -8,10 +8,14 @@ export interface Product {
   originalPrice: number;
   badge: string;
   image: string;
+  images?: string[];
   campus: string;
+  category?: "men" | "women" | "unisex";
+  inStock?: boolean;
 }
 
 export const campuses = [
+  "All",
   "IIT BHU",
   "IIT Kharagpur",
   "IIT Roorkee",
@@ -183,72 +187,76 @@ export const products: Product[] = [
 
 export function ProductCard({
   product,
-  add,
+  onOpenDetail,
   isWishlisted,
   onToggleWishlist,
 }: {
   product: Product;
-  add: (product: Product, size: string) => void;
+  onOpenDetail: (product: Product) => void;
   isWishlisted: boolean;
   onToggleWishlist: (productId: string) => void;
 }) {
-  const SIZES = ["S", "M", "L", "XL"];
-  const [imgSrc, setImgSrc] = useState(product.image);
-  const [errorStep, setErrorStep] = useState(0);
+  const allImages = Array.isArray(product.images) && product.images.length > 0
+    ? product.images
+    : [product.image];
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+  const [intervalId, setIntervalId] = useState<number | null>(null);
 
-  const handleImageError = () => {
-    if (errorStep === 0) {
-      setErrorStep(1);
-      setImgSrc(product.image.replace("/items/", "/Items/"));
-    } else if (errorStep === 1) {
-      setErrorStep(2);
-      const switchedExt = product.image.endsWith(".png")
-        ? product.image.replace(".png", ".jpg")
-        : product.image.replace(".jpg", ".png");
-      setImgSrc(switchedExt);
-    } else if (errorStep === 2) {
-      setErrorStep(3);
-      setImgSrc(
-        product.image
-          .replace("/items/", "/Items/")
-          .replace(".png", ".jpg")
-      );
-    } else {
-      setImgSrc("/assets/unora.jpg");
+  const isOutOfStock = product.inStock === false;
+
+  const handleMouseEnter = () => {
+    if (allImages.length <= 1) return;
+    const id = window.setInterval(() => {
+      setActiveImgIdx((prev) => (prev + 1) % allImages.length);
+    }, 900);
+    setIntervalId(id);
+  };
+
+  const handleMouseLeave = () => {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      setIntervalId(null);
     }
+    setActiveImgIdx(0);
   };
 
   return (
-    <div className="product-card group">
-      <div className="product-card__image relative overflow-hidden">
+    <div
+      onClick={() => onOpenDetail(product)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`product-card group cursor-pointer transition-opacity duration-200 ${
+        isOutOfStock ? "opacity-60" : "opacity-100"
+      }`}
+    >
+      <div className="product-card__image relative overflow-hidden bg-[#D7CEC2] rounded-xl aspect-[3/4]">
         <img
-          src={imgSrc}
+          src={allImages[activeImgIdx] || product.image}
           alt={`${product.name} campaign`}
-          onError={handleImageError}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={(e) => {
+            e.currentTarget.src = "/assets/unora.jpg";
+          }}
         />
-        <span className="badge">{product.badge}</span>
+        {isOutOfStock ? (
+          <span className="badge bg-[#3C1A11]/80 text-[#FFF8F0] border border-[#FFF8F0]/30 font-black">
+            OUT OF STOCK
+          </span>
+        ) : (
+          <span className="badge">{product.badge}</span>
+        )}
         <button
+          type="button"
           className={`wish ${isWishlisted ? "wish--active" : ""}`}
-          onClick={() => onToggleWishlist(product.id)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleWishlist(product.id);
+          }}
           aria-label="Add to wishlist"
         >
           <Icon name="heart" size={16} />
         </button>
-
-        <div className="quick-add flex flex-col items-center justify-center gap-1 px-2.5 py-2">
-          <div className="flex gap-1.5 w-full justify-center">
-            {SIZES.map((sz) => (
-              <button
-                key={sz}
-                type="button"
-                onClick={() => add(product, sz)}
-                className="flex-1 py-1 text-xs font-black bg-[#FFF8F0] text-[#3C1A11] hover:bg-[#3C1A11] hover:text-[#BDF119] rounded-md transition-colors cursor-pointer shadow-xs text-center"
-              >
-                {sz}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
       <div className="product-card__info">
         <h3>{product.name}</h3>
@@ -262,24 +270,29 @@ export function ProductCard({
 }
 
 export interface CatalogProps {
-  onAddToCart: (product: Product, size: string) => void;
+  products: Product[];
+  onOpenDetail: (product: Product) => void;
   wishlistItems: string[];
   onToggleWishlist: (productId: string) => void;
   searchQuery?: string;
   onClearSearch?: (term?: string) => void;
+  selectedCategory?: "all" | "men" | "women";
 }
-
 export const Catalog: React.FC<CatalogProps> = ({
-  onAddToCart,
+  products: liveProducts,
+  onOpenDetail,
   wishlistItems = [],
   onToggleWishlist,
   searchQuery = "",
   onClearSearch,
+  selectedCategory = "all",
 }) => {
-  const [campus, setCampus] = useState("IIT BHU");
+  const [campus, setCampus] = useState("All");
   const [filter, setFilter] = useState("All drops");
   const [sort, setSort] = useState("Trending");
   const [sortOpen, setSortOpen] = useState(false);
+
+  const activeProducts = liveProducts.length > 0 ? liveProducts : products;
 
   const sortOptions = [
     "Trending",
@@ -290,13 +303,31 @@ export const Catalog: React.FC<CatalogProps> = ({
 
   const cleanQuery = searchQuery.trim().toLowerCase();
 
-  const displayProducts = [...products]
+  const displayProducts = [...activeProducts]
     .filter((p) => {
       if (cleanQuery) {
         const matchesName = p.name.toLowerCase().includes(cleanQuery);
         const matchesCampus = p.campus.toLowerCase().includes(cleanQuery);
         const matchesBadge = p.badge.toLowerCase().includes(cleanQuery);
         return matchesName || matchesCampus || matchesBadge;
+      }
+
+      if (selectedCategory !== "all") {
+        const prodCat = (p.category || "unisex").toLowerCase();
+        if (selectedCategory === "men" && prodCat !== "men" && prodCat !== "unisex") {
+          return false;
+        }
+        if (selectedCategory === "women" && prodCat !== "women" && prodCat !== "unisex") {
+          return false;
+        }
+      }
+
+      if (campus !== "All") {
+        const matchesSelectedCampus = p.campus.toLowerCase() === campus.toLowerCase();
+        const isGeneralItem = p.campus.toLowerCase() === "general";
+        if (!matchesSelectedCampus && !isGeneralItem) {
+          return false;
+        }
       }
 
       if (filter === "T-shirts") return p.name.toLowerCase().includes("tee");
@@ -310,6 +341,18 @@ export const Catalog: React.FC<CatalogProps> = ({
       return true;
     })
     .sort((a, b) => {
+      if (selectedCategory === "men") {
+        const aIsDirect = (a.category || "unisex").toLowerCase() === "men" ? 1 : 0;
+        const bIsDirect = (b.category || "unisex").toLowerCase() === "men" ? 1 : 0;
+        if (bIsDirect !== aIsDirect) return bIsDirect - aIsDirect;
+      }
+
+      if (selectedCategory === "women") {
+        const aIsDirect = (a.category || "unisex").toLowerCase() === "women" ? 1 : 0;
+        const bIsDirect = (b.category || "unisex").toLowerCase() === "women" ? 1 : 0;
+        if (bIsDirect !== aIsDirect) return bIsDirect - aIsDirect;
+      }
+
       if (sort === "Price: Low to High") {
         return a.price - b.price;
       }
@@ -320,16 +363,14 @@ export const Catalog: React.FC<CatalogProps> = ({
         return b.id.localeCompare(a.id);
       }
 
-      const aMatchesCampus = a.campus === campus ? 1 : 0;
-      const bMatchesCampus = b.campus === campus ? 1 : 0;
-      return bMatchesCampus - aMatchesCampus;
+      return 0;
     });
   return (
     <section id="shop" className="section">
       <div className="section-heading">
         <div>
           <span className="eyebrow eyebrow--dark">CURATED FOR YOUR CAMPUS</span>
-          <h2>TRENDING IN {campus.toUpperCase()}</h2>
+          <h2>{campus === "All" ? "ALL CAMPUS DROPS" : `TRENDING IN ${campus.toUpperCase()}`}</h2>
         </div>
         <a href="#shop">View all drops</a>
       </div>
@@ -424,7 +465,7 @@ export const Catalog: React.FC<CatalogProps> = ({
             <ProductCard
               key={product.id}
               product={product}
-              add={onAddToCart}
+              onOpenDetail={onOpenDetail}
               isWishlisted={wishlistItems.includes(product.id)}
               onToggleWishlist={onToggleWishlist}
             />

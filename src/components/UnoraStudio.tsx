@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { Icon } from "./Icons";
+import type { Product } from "./Catalog";
 
 export interface UnoraStudioProps {
-  onAddToBag?: (itemName: string, quantity: number, price: number, customizedText: string) => void;
-  add?: (item: {
+  isOpen: boolean;
+  onClose: () => void;
+  baseProduct: Product | null;
+  onAddToBag: (item: {
     name: string;
     basePrice: number;
     customFee: number;
@@ -13,200 +15,121 @@ export interface UnoraStudioProps {
   }) => void;
 }
 
-export const UnoraStudio: React.FC<UnoraStudioProps> = ({ onAddToBag, add }) => {
-  const [text, setText] = useState("IIT DELHI");
-  const [color, setColor] = useState("#FFF8F0");
-  const [style, setStyle] = useState("Varsity Block");
+export const UnoraStudio: React.FC<UnoraStudioProps> = ({
+  isOpen,
+  onClose,
+  baseProduct,
+  onAddToBag,
+}) => {
+  if (!isOpen || !baseProduct) return null;
+
+  const [text, setText] = useState("");
   const [size, setSize] = useState("L");
   const [qty, setQty] = useState(1);
 
-  const colors = [
-    ["#FFF8F0", "Off-white"],
-    ["#3C1A11", "Dark brown"],
-    ["#2952CC", "Royal blue"],
-    ["#F6B39E", "Soft peach"],
-  ];
+  const SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+  const customFee = 299;
 
   const handleAdd = () => {
-    if (add) {
-      add({
-        name: "Campus Custom Hoodie",
-        basePrice: 1499,
-        customFee: 299,
-        customText: text,
-        size,
-        quantity: qty,
-      });
-    } else if (onAddToBag) {
-      onAddToBag("Campus Custom Hoodie", qty, 1798, text);
-    }
+    const cleanText = text.trim();
+    onAddToBag({
+      name: cleanText ? `${baseProduct.name} (Custom: ${cleanText})` : baseProduct.name,
+      basePrice: baseProduct.price,
+      customFee: cleanText ? customFee : 0,
+      customText: cleanText,
+      size,
+      quantity: qty,
+    });
+    onClose();
   };
 
   return (
-    <section id="unora-studio" className="studio-section">
-      <div className="studio-heading section-heading">
+    <div className="fixed inset-0 z-[150] bg-[#FFF8F0] overflow-y-auto text-[#3C1A11]">
+      <div className="sticky top-0 z-20 bg-[#FFF8F0] border-b-2 border-[#3C1A11] px-6 py-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 rounded-xl border-2 border-[#3C1A11] hover:bg-[#3C1A11] hover:text-[#FFE2C7] transition-all cursor-pointer font-black text-xs uppercase"
+        >
+          ✕ Close
+        </button>
+        <span className="font-anton text-2xl uppercase">UNORA CUSTOM LAB</span>
+        <div className="w-10" />
+      </div>
+
+      <div className="mx-auto max-w-4xl p-6 md:p-10 space-y-8">
         <div>
-          <span className="eyebrow eyebrow--lime">DESIGN LAB / 01</span>
-          <h2>UNORA STUDIO</h2>
-        </div>
-        <p>One of one, made for your campus story.</p>
-      </div>
-
-      <div className="studio-layout">
-        <div className="preview-column">
-          <a className="back-link" href="#gallery">
-            ← Back to gallery
-          </a>
-          <div className="preview">
-            <span className="preview__label">LIVE PREVIEW</span>
-            <div className="hoodie" style={{ "--garment": color } as React.CSSProperties}>
-              <div className="hoodie__hood" />
-              <div className="hoodie__arm hoodie__arm--left" />
-              <div className="hoodie__arm hoodie__arm--right" />
-              <div className="hoodie__body">
-                <span className={`print print--${style.replace(/\s+/g, "-").toLowerCase()}`}>
-                  {text || "YOUR TEXT"}
-                </span>
-                <small>UNORA / CAMPUS DEPT.</small>
-              </div>
-            </div>
-            <span className="preview__zoom">Drag to rotate · Pinch to zoom</span>
-          </div>
-
-          <div className="thumbs">
-            <button className="active">FRONT</button>
-            <button>BACK</button>
-          </div>
+          <span className="text-[10px] font-black uppercase tracking-widest text-[#D94F27]">CUSTOMIZE BASE PIECE</span>
+          <h2 className="font-anton text-3xl md:text-4xl uppercase tracking-tight text-[#3C1A11] mt-1">{baseProduct.name}</h2>
+          <p className="text-xs font-semibold text-[#3C1A11]/70 mt-1">
+            Enter the exact name, roll number, or department you want printed on this piece.
+          </p>
         </div>
 
-        <div className="customizer">
-          <div className="breadcrumbs">
-            UNORA STUDIO / CUSTOMIZED CAMPUS WEAR / HEAVYWEIGHT HOODIE
-          </div>
-          <h3>The Signature Campus Custom Hoodie</h3>
-          <div className="rating">
-            <span>★★★★★</span> <b>4.9</b> (124 Campus Reviews)
-          </div>
-
-          <div className="control-group">
-            <label>01 / GARMENT TYPE</label>
-            <div className="segmented">
-              {["Hoodie", "T-Shirt", "Sweatshirt"].map((item, i) => (
-                <button className={i === 0 ? "active" : ""} key={item}>
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="control-group">
-            <label>
-              02 / SELECT BASE COLOR{" "}
-              <span>{colors.find((c) => c[0] === color)?.[1]}</span>
+        <div className="bg-white border-2 border-[#3C1A11] rounded-3xl p-6 md:p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="block text-xs font-black uppercase tracking-wider">
+              Text to Print (Max 15 Characters)
             </label>
-            <div className="swatches">
-              {colors.map(([value, name]) => (
-                <button
-                  aria-label={name}
-                  title={name}
-                  key={value}
-                  className={color === value ? "active" : ""}
-                  style={{ background: value }}
-                  onClick={() => setColor(value)}
-                />
-              ))}
-            </div>
+            <input
+              type="text"
+              maxLength={15}
+              value={text}
+              onChange={(e) => setText(e.target.value.toUpperCase())}
+              placeholder="LEAVE EMPTY IF NO CUSTOM PRINT DESIRED"
+              className="w-full h-14 px-4 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] font-anton text-lg tracking-wider text-[#3C1A11] outline-none"
+            />
+            <span className="text-[10px] font-bold text-[#3C1A11]/50">{text.length}/15 characters</span>
           </div>
 
-          <div className="control-group">
-            <label>
-              03 / YOUR CUSTOM TEXT <span>Campus name, department, roll no.</span>
-            </label>
-            <div className={`text-input ${text.length >= 15 ? "error" : ""}`}>
-              <input
-                id="custom-text"
-                maxLength={15}
-                value={text}
-                onChange={(e) => setText(e.target.value.toUpperCase())}
-              />
-              <span>{text.length} / 15</span>
-            </div>
-          </div>
-
-          <div className="control-group">
-            <label>04 / CUSTOMIZATION STYLE</label>
-            <div className="style-cards">
-              {["Varsity Block", "Modern Sans", "Handwritten"].map((item) => (
+          <div className="space-y-2">
+            <label className="block text-xs font-black uppercase tracking-wider">Select Size</label>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+              {SIZES.map((sz) => (
                 <button
-                  key={item}
-                  className={style === item ? "active" : ""}
-                  onClick={() => setStyle(item)}
+                  key={sz}
+                  type="button"
+                  onClick={() => setSize(sz)}
+                  className={`h-11 rounded-xl border-2 font-black text-xs uppercase cursor-pointer ${
+                    size === sz ? "bg-[#3C1A11] text-[#BDF119]" : "bg-white text-[#3C1A11]"
+                  }`}
                 >
-                  <b className={`type-${item.replace(/\s+/g, "-").toLowerCase()}`}>Aa</b>
-                  <span>{item}</span>
+                  {sz}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="control-group">
-            <label>
-              05 / SIZE <a href="#guide">Size guide</a>
-            </label>
-            <div className="size-row">
-              <div className="sizes">
-                {["S", "M", "L", "XL", "XXL"].map((item) => (
-                  <button
-                    key={item}
-                    className={size === item ? "active" : ""}
-                    onClick={() => setSize(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <div className="stepper">
-                <button onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
-                <span>{qty}</span>
-                <button onClick={() => setQty(qty + 1)}>+</button>
-              </div>
+          <div className="flex items-center gap-4">
+            <label className="text-xs font-black uppercase tracking-wider">Quantity</label>
+            <div className="flex items-center h-10 border-2 border-[#3C1A11] rounded-xl bg-white overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setQty(Math.max(1, qty - 1))}
+                className="px-3 text-sm font-black hover:bg-[#3C1A11]/10 cursor-pointer"
+              >
+                −
+              </button>
+              <span className="px-4 text-xs font-black">{qty}</span>
+              <button
+                type="button"
+                onClick={() => setQty(qty + 1)}
+                className="px-3 text-sm font-black hover:bg-[#3C1A11]/10 cursor-pointer"
+              >
+                +
+              </button>
             </div>
           </div>
 
-          <div className="price-card">
-            <div>
-              <span>Base apparel price</span>
-              <b>₹1,499.00</b>
-            </div>
-            <div>
-              <span>Unora Studio printing</span>
-              <b>₹299.00</b>
-            </div>
-            <hr />
-            <div className="total">
-              <span>Total price</span>
-              <b>₹{(1798 * qty).toLocaleString("en-IN")}.00</b>
-            </div>
-          </div>
-
-          <button className="add-button" onClick={handleAdd}>
-            <Icon name="bag" />
-            ADD TO YOUR BAG
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="w-full h-14 bg-[#D94F27] hover:bg-[#F47E20] text-[#FFE2C7] font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
+          >
+            CONFIRM & ADD TO BAG
           </button>
-
-          <div className="trust">
-            <span>
-              <Icon name="check" size={12} /> Printed in 3–5 days
-            </span>
-            <span>
-              <Icon name="check" size={12} /> Free hostel delivery
-            </span>
-            <span>
-              <Icon name="check" size={12} /> Easy returns
-            </span>
-          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 };
