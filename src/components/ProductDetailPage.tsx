@@ -177,22 +177,22 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
             </div>
 
-            <div className="border-2 border-dashed border-[#3C1A11] bg-[#FFF8F0] p-4 rounded-2xl flex items-center justify-between gap-4">
-              <div>
+            {/* <div className="border-2 border-dashed border-[#3C1A11] bg-[#FFF8F0] p-4 rounded-2xl flex items-center justify-between gap-4"> */}
+              {/* <div>
                 <span className="font-anton text-base uppercase text-[#3C1A11] block">Personalize This Garment</span>
                 <span className="text-[11px] font-semibold text-[#3C1A11]/70 block mt-0.5">
                   Print your name & roll number onto this piece via Studio.
                 </span>
-              </div>
-              <button
+              </div> */}
+              {/* <button
                 type="button"
                 disabled={product.inStock === false}
                 onClick={() => onLaunchStudio(product)}
                 className="px-4 h-10 bg-[#3C1A11] hover:bg-[#2952CC] disabled:bg-[#3C1A11]/30 disabled:cursor-not-allowed text-[#BDF119] font-black uppercase text-[10px] tracking-wider rounded-xl transition-all shrink-0 cursor-pointer"
               >
                 {product.inStock === false ? "UNAVAILABLE" : "OPEN STUDIO"}
-              </button>
-            </div>
+              </button> */}
+            {/* </div> */}
 
             <div className="border-2 border-dashed border-[#3C1A11] bg-[#FFF8F0] p-4 rounded-2xl flex items-center justify-between gap-4">
               <div>
