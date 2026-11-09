@@ -1,5 +1,6 @@
 import React from "react";
 import type { Product } from "./Catalog";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface WishlistDrawerProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({
   onMoveToBag,
   onRemoveFromWishlist,
 }) => {
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   const wishlistedProducts = products.filter((p) => wishlistIds.includes(p.id));

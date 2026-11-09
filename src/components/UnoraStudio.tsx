@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { Product } from "./Catalog";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export interface UnoraStudioProps {
   isOpen: boolean;
@@ -21,11 +22,12 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
   baseProduct,
   onAddToBag,
 }) => {
-  if (!isOpen || !baseProduct) return null;
 
   const [text, setText] = useState("");
   const [size, setSize] = useState("L");
   const [qty, setQty] = useState(1);
+  useBodyScrollLock(isOpen);
+  if (!isOpen || !baseProduct) return null;
 
   const SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
   const customFee = 299;

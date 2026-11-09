@@ -3,6 +3,7 @@ import type { CartItem } from "./CartSidebar";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 import emailjs from "@emailjs/browser";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface CheckoutProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
   const paymentMethod = "upi";
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   const itemsTotal = items.reduce(

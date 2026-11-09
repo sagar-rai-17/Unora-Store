@@ -1,5 +1,6 @@
 import React from "react";
 import { Brand } from "./Icons";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export type StaticInfoType = "returns" | "investors" | "community" | "terms" | "privacy";
 
@@ -72,6 +73,7 @@ const STATIC_CONTENT: Record<StaticInfoType, { title: string; subtitle: string; 
 };
 
 export const StaticInfoModal: React.FC<StaticInfoModalProps> = ({ isOpen, type, onClose }) => {
+    useBodyScrollLock(isOpen);
   if (!isOpen || !type) return null;
   const content = STATIC_CONTENT[type];
 

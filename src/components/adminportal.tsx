@@ -4,6 +4,7 @@ import { signOut, onAuthStateChanged, type User } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { checkIsAdmin } from "../utils/adminCheck";
 import { convertGoogleDriveUrl } from "../utils/driveImage";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 const CAMPUSES = [
   "ALL",
@@ -420,7 +421,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
       return matchesCampus && matchesStatus && matchesSearch;
     });
   }, [orders, selectedCampus, selectedStatusFilter, searchQuery]);
-
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   const isAuthorized = Boolean(currentUser && isAdminUser);

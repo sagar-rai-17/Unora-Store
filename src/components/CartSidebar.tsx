@@ -1,6 +1,7 @@
 import React from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export interface CartItem {
   id: string | number;
@@ -103,7 +104,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     onApplyDiscount(autoOfferDiscount, null);
     setCouponError(null);
   };
-
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   return (

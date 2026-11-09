@@ -1,36 +1,52 @@
 import React, { useState } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onRequireAuth?: () => void;
   defaultName?: string;
 }
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   isOpen,
   onClose,
+  onRequireAuth,
   defaultName = "",
 }) => {
-  if (!isOpen) return null;
-
   const [name, setName] = useState(defaultName);
   const [rating, setRating] = useState(5);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [authError, setAuthError] = useState(false);
+
+  useBodyScrollLock(isOpen);
+  if (!isOpen) return null;
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
+
+    if (!auth.currentUser) {
+      setAuthError(true);
+      if (onRequireAuth) {
+        onRequireAuth();
+      }
+      return;
+    }
+
     setLoading(true);
+    setAuthError(false);
 
     try {
       await addDoc(collection(db, "feedback"), {
-        userId: auth.currentUser?.uid || "guest",
-        name: name.trim() || "Anonymous Student",
-        email: auth.currentUser?.email || "",
+        userId: auth.currentUser.uid,
+        name: name.trim() || auth.currentUser.displayName || "Campus Student",
+        email: auth.currentUser.email || "",
         rating,
         message: message.trim(),
         createdAt: serverTimestamp(),
@@ -42,7 +58,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         onClose();
       }, 1800);
     } catch (err) {
-      console.error(err);
+      console.error("Feedback submit error:", err);
     } finally {
       setLoading(false);
     }
@@ -55,6 +71,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           <h3 className="font-anton text-2xl uppercase">Campus Feedback</h3>
           <button type="button" onClick={onClose} className="font-black text-sm cursor-pointer">✕</button>
         </div>
+
+        {authError && (
+          <div className="mb-4 p-3 bg-[#D94F27]/10 border border-[#D94F27] rounded-xl text-xs font-bold text-[#D94F27]">
+            Please sign in to submit campus feedback.
+          </div>
+        )}
 
         {submitted ? (
           <div className="py-8 text-center space-y-2">

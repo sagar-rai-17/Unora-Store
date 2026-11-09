@@ -1,5 +1,6 @@
 import React from "react";
 import { Brand } from "./Icons";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface AboutUsModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
   onClose,
   onOpenFeedback,
 }) => {
+    useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   return (

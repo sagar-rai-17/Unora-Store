@@ -1,4 +1,5 @@
 import React from "react";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export interface OrderRecord {
   id: string;
@@ -23,6 +24,7 @@ interface AccountPageProps {
   onTrackOrder: (orderId: string) => void;
 }
 
+
 export const AccountPage: React.FC<AccountPageProps> = ({
   isOpen,
   onClose,
@@ -32,8 +34,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   onTrackOrder,
 }) => {
   const displayOrders = orders;
-
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
+  
 
   return (
     <div className="fixed inset-0 z-115 bg-[#FFF8F0] overflow-y-auto text-[#3C1A11]">
@@ -66,6 +69,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
         </button>
       </div>
 
+      
       <div className="mx-auto max-w-5xl p-6 md:p-10 space-y-10">
         
         <div>

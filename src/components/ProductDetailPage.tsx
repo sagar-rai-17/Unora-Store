@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { Product } from "./Catalog";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface ProductDetailPageProps {
   product: Product | null;
@@ -28,7 +29,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [showSizeChart, setShowSizeChart] = useState<boolean>(false);
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState(false);
-
+    useBodyScrollLock(isOpen);
   if (!isOpen || !product) return null;
 
   const images = [product.image, product.image, product.image, product.image];
