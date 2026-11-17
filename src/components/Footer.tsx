@@ -108,9 +108,9 @@ export const Footer: React.FC<FooterProps> = ({
       </div>
 
       <div className="help-banner">
-        <span>FOR ANY HELP, CALL US AT 1800-266-3333</span>
+        <span>FOR ANY HELP, CALL US AT </span>
         <span>Mon–Sat, 10 AM–7 PM IST</span>
-        <span>hello@unora.in</span>
+        <span>unoraclothin.in</span>
       </div>
 
       <div className="copyright">
