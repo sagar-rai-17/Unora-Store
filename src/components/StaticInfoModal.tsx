@@ -12,14 +12,78 @@ interface StaticInfoModalProps {
 
 const STATIC_CONTENT: Record<StaticInfoType, { title: string; subtitle: string; body: React.ReactNode }> = {
   returns: {
-    title: "Returns & Refund Policy",
-    subtitle: "For our Believers",
+    title: "Return, Refund & Replacement Policy",
+    subtitle: "Campus Policy & Verification",
     body: (
       <div className="space-y-4 text-xs font-semibold leading-relaxed text-[#3C1A11]/80">
-        <p>At Unora, we build apparel engineered for campus durability. If your order does not fit as expected or arrives with a defect, you are eligible for an exchange or refund within <strong>7-10 days of hostel delivery</strong>.</p>
-        <p><strong>Condition Requirements:</strong> All returned pieces must be unworn, unwashed, with original tags attached, and in original packaging. Items showing signs of wear, perfume odor, or hostel wash damage will not be accepted.</p>
-        <p><strong>Custom & Studio Drops:</strong> Any garment customized via Unora Studio (bearing your personal name, roll number, or department print) is <strong>final sale</strong> and non-refundable, unless there is a verifiable manufacturing or print defect.</p>
-        <p><strong>Refund Timeline:</strong> Once our campus delivery node inspects the returned piece, refunds are processed back to your original payment method within 7-10 business days.</p>
+        <p>
+          At Unora, we take great care in packaging and delivering every order. Since many of our products are customised or made specifically for individual campuses, we follow a clear return and replacement policy.
+        </p>
+
+        <div>
+          <h4 className="font-bold text-sm text-[#3C1A11] mb-1">1. Unboxing Video Is Mandatory</h4>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Customers must record a continuous, unedited video while opening the package.</li>
+            <li>The video must begin before the package is opened and clearly show the outer packaging, shipping label, package condition, and the product inside.</li>
+            <li>Any damage, missing items, incorrect products, or manufacturing defects must be clearly visible in the video.</li>
+            <li>Claims submitted without a valid unboxing video may not be eligible for a replacement or refund.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-sm text-[#3C1A11] mb-1">2. Reporting Time Limit</h4>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Any complaint regarding damaged, defective, incorrect, or missing products must be reported within <strong>3 days (72 hours)</strong> of delivery.</li>
+            <li>Customers must contact us through our official email and provide order details along with the unboxing video and relevant photographs.</li>
+            <li>Complaints received after the 72-hour window may not be considered.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-sm text-[#3C1A11] mb-1">3. Eligible Cases for Replacement</h4>
+          <p className="mb-1">A replacement or refund may be considered in the following situations:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>The product arrives damaged.</li>
+            <li>The customer receives an incorrect product or design.</li>
+            <li>Items are missing from the delivered order.</li>
+            <li>The product has a verified manufacturing defect.</li>
+          </ul>
+          <p className="mt-1 italic">All claims are subject to verification and approval by our team.</p>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-sm text-[#3C1A11] mb-1">4. Non-Returnable Items</h4>
+          <p className="mb-1">Due to the customised nature of our merchandise, the following are not eligible for return or exchange:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Customised or personalised products (e.g. if your name or roll number is printed on the garment).</li>
+            <li>Products made specifically for an event or organisation.</li>
+            <li>Products with customer-approved sizes or specifications (e.g. if you selected size M and received size M, sizing preference mismatches are not eligible).</li>
+            <li>Products damaged due to improper handling after delivery.</li>
+            <li>Products reported after the 72-hour complaint window.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-sm text-[#3C1A11] mb-1">5. Refunds & Replacements</h4>
+          <p className="mb-1">Once a complaint is verified and approved, we will determine whether a replacement or refund is appropriate:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Approved replacements will be processed as soon as reasonably possible.</li>
+            <li>Approved refunds will be issued through the original payment method or another mutually agreed method.</li>
+            <li>Shipping charges, where applicable, will be handled based on the nature of the issue.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-sm text-[#3C1A11] mb-1">6. How to Raise a Complaint</h4>
+          <p className="mb-1">To report an issue, please email <a href="mailto:unoraclothin@gmail.com" className="text-[#2952CC] font-bold underline">unoraclothin@gmail.com</a> within 72 hours of delivery with:</p>
+          <ol className="list-decimal pl-4 space-y-1">
+            <li>Order ID.</li>
+            <li>Continuous, unedited unboxing video.</li>
+            <li>Clear photographs of the issue, if applicable.</li>
+            <li>Brief description of the problem.</li>
+          </ol>
+          <p className="mt-2 text-[#D94F27] font-bold">Important: Please retain the original packaging until your complaint has been resolved.</p>
+        </div>
       </div>
     ),
   },
