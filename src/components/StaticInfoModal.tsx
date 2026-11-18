@@ -13,13 +13,13 @@ interface StaticInfoModalProps {
 const STATIC_CONTENT: Record<StaticInfoType, { title: string; subtitle: string; body: React.ReactNode }> = {
   returns: {
     title: "Returns & Refund Policy",
-    subtitle: "7-Day Campus Guarantee",
+    subtitle: "For our Believers",
     body: (
       <div className="space-y-4 text-xs font-semibold leading-relaxed text-[#3C1A11]/80">
-        <p>At Unora, we build apparel engineered for campus durability. If your order does not fit as expected or arrives with a defect, you are eligible for an exchange or refund within <strong>7 days of hostel delivery</strong>.</p>
+        <p>At Unora, we build apparel engineered for campus durability. If your order does not fit as expected or arrives with a defect, you are eligible for an exchange or refund within <strong>7-10 days of hostel delivery</strong>.</p>
         <p><strong>Condition Requirements:</strong> All returned pieces must be unworn, unwashed, with original tags attached, and in original packaging. Items showing signs of wear, perfume odor, or hostel wash damage will not be accepted.</p>
         <p><strong>Custom & Studio Drops:</strong> Any garment customized via Unora Studio (bearing your personal name, roll number, or department print) is <strong>final sale</strong> and non-refundable, unless there is a verifiable manufacturing or print defect.</p>
-        <p><strong>Refund Timeline:</strong> Once our campus delivery node inspects the returned piece, refunds are processed back to your original payment method within 5–7 business days.</p>
+        <p><strong>Refund Timeline:</strong> Once our campus delivery node inspects the returned piece, refunds are processed back to your original payment method within 7-10 business days.</p>
       </div>
     ),
   },
@@ -30,7 +30,7 @@ const STATIC_CONTENT: Record<StaticInfoType, { title: string; subtitle: string; 
       <div className="space-y-4 text-xs font-semibold leading-relaxed text-[#3C1A11]/80">
         <p>Unora is an early-stage apparel startup founded at IIT Roorkee, building direct-to-campus streetwear for India's top academic institutions.</p>
         <p>We operate on a hyper-localized logistics model that delivers directly past campus security gates to student hostel rooms, eliminating last-mile shipping friction.</p>
-        <p>We are currently privately held and self-funded, focusing on supply-chain efficiency and unit-level profitability across target institutes. For institutional investment inquiries and partnership discussions, reach out directly to our founders at <a href="mailto:invest@unora.in" className="text-[#2952CC] font-bold underline">invest@unora.in</a>.</p>
+        <p>We are currently privately held and self-funded, focusing on supply-chain efficiency and unit-level profitability across target institutes. For institutional investment inquiries and partnership discussions, reach out directly to our founders at <a href="mailto:unoraclothin@gmail.com" className="text-[#2952CC] font-bold underline">invest@unora.in</a>.</p>
       </div>
     ),
   },

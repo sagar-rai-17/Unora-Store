@@ -89,6 +89,29 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [newReelUrl, setNewReelUrl] = useState("");
   const [newReelCaption, setNewReelCaption] = useState("");
   const [reelLoading, setReelLoading] = useState(false);
+  const [showReelsOnHome, setShowReelsOnHome] = useState(false);
+const [reelsSettingSuccess, setReelsSettingSuccess] = useState(false);
+
+useEffect(() => {
+  if (!isOpen) return;
+  const unsubSetting = onSnapshot(doc(db, "settings", "reels"), (snap) => {
+    if (snap.exists()) {
+      setShowReelsOnHome(snap.data().showReels === true);
+    }
+  });
+  return () => unsubSetting();
+}, [isOpen]);
+
+const handleToggleReelsVisibility = async (enabled: boolean) => {
+  try {
+    setShowReelsOnHome(enabled);
+    await setDoc(doc(db, "settings", "reels"), { showReels: enabled }, { merge: true });
+    setReelsSettingSuccess(true);
+    setTimeout(() => setReelsSettingSuccess(false), 2000);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   useEffect(() => {
     if (isOpen) {
@@ -585,6 +608,36 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                 Paste Instagram reel links to stream real campus fits directly to the homepage.
               </p>
             </div>
+
+            <div className="bg-[#FFF8F0] border-2 border-[#3C1A11] p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+  <div>
+    <h3 className="font-anton text-lg uppercase text-[#3C1A11]">Homepage Reels Section Visibility</h3>
+    <p className="text-xs font-semibold text-[#3C1A11]/70 mt-0.5">
+      Toggle whether the Campus Influencer Reels row is visible on the homepage.
+    </p>
+    {reelsSettingSuccess && <span className="text-[10px] font-black text-[#2952CC] uppercase">Setting updated live!</span>}
+  </div>
+  <div className="flex gap-2">
+    <button
+      type="button"
+      onClick={() => handleToggleReelsVisibility(true)}
+      className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+        showReelsOnHome ? "bg-[#3C1A11] text-[#BDF119]" : "bg-[#3C1A11]/10 text-[#3C1A11]"
+      }`}
+    >
+      Show
+    </button>
+    <button
+      type="button"
+      onClick={() => handleToggleReelsVisibility(false)}
+      className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+        !showReelsOnHome ? "bg-[#D94F27] text-white" : "bg-[#3C1A11]/10 text-[#3C1A11]"
+      }`}
+    >
+      Hide
+    </button>
+  </div>
+</div>
 
             <form onSubmit={handleAddReel} className="bg-[#FFF8F0] border-2 border-[#3C1A11] p-5 rounded-2xl space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -56,6 +56,18 @@ export default function App() {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [staticInfoType, setStaticInfoType] = useState<StaticInfoType | null>(null);
+  const [showReels, setShowReels] = useState(false);
+
+  useEffect(() => {
+  const unsubReelsSetting = onSnapshot(doc(db, "settings", "reels"), (snap) => {
+    if (snap.exists()) {
+      setShowReels(snap.data().showReels === true);
+    } else {
+      setShowReels(false);
+    }
+  });
+  return () => unsubReelsSetting();
+}, []);
 
   useEffect(() => {
     const unsubInv = onSnapshot(collection(db, "inventory"), (snap) => {
@@ -472,7 +484,7 @@ export default function App() {
             setStudioProduct(null);
           }}
         />
-        <Reels />
+        {showReels && <Reels />}
         <SocialProof />
         <Footer
           onOpenAccount={() => {

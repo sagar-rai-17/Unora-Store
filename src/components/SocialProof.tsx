@@ -11,7 +11,7 @@ export const SocialProof: React.FC = () => {
     ],
     [
       "How long does Unora Studio customization take?",
-      "Personalized pieces are printed in 3–5 working days, quality checked, and then shipped. You’ll receive tracking as soon as it leaves our studio.",
+      "Personalized pieces are printed in 7–10 working days, quality checked, and then shipped. You’ll receive tracking as soon as it leaves our studio.",
     ],
     [
       "Can I return a customized product?",
