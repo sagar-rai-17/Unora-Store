@@ -262,7 +262,7 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
                 setText(e.target.value.toUpperCase());
                 setIsSelected(true);
               }}
-              placeholder="E.G. SAGAR / 24112090"
+              placeholder="E.G. SAGAR"
               className="w-full p-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] font-anton text-lg tracking-wider text-[#3C1A11] outline-none resize-none"
             />
             <span className="text-[10px] font-bold text-[#3C1A11]/50">{text.length}/25 characters</span>

@@ -112,7 +112,6 @@ export const SocialProof: React.FC = () => {
             <span className="eyebrow eyebrow--dark">NEED TO KNOW</span>
             <h2>CAMPUS FAQs</h2>
           </div>
-          <a href="#support">Still stuck? Talk to a human</a>
         </div>
 
         <div className="faq-list">
