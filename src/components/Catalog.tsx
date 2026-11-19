@@ -9,6 +9,8 @@ export interface Product {
   badge: string;
   image: string;
   images?: string[];
+  imagesRegular?: string[];
+  imagesOversized?: string[];
   campus: string;
   category?: "men" | "women" | "unisex";
   inStock?: boolean;

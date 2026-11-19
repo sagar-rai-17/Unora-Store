@@ -29,10 +29,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [showSizeChart, setShowSizeChart] = useState<boolean>(false);
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
     useBodyScrollLock(isOpen);
   if (!isOpen || !product) return null;
 
-  const images = [product.image, product.image, product.image, product.image];
+  const fallbackPair = [product.image, product.image];
+  const images = selectedFit === "Oversized-fit"
+    ? (product.imagesOversized && product.imagesOversized.length > 0 ? product.imagesOversized : fallbackPair)
+    : (product.imagesRegular && product.imagesRegular.length > 0 ? product.imagesRegular : fallbackPair);
   const unitPrice = selectedFit === "Oversized-fit" ? product.price + 20 : product.price;
 
   return (
@@ -55,8 +59,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-7 grid grid-cols-2 gap-3 sm:gap-4">
             {images.map((img, idx) => (
-              <div key={idx} className="aspect-[3/4] rounded-2xl overflow-hidden border-2 border-[#3C1A11] bg-white shadow-sm">
-                <img src={img} alt={`${product.name} view ${idx + 1}`} className="w-full h-full object-cover" />
+              <div
+                key={idx}
+                onClick={() => setLightboxImg(img)}
+                className="aspect-[3/4] rounded-2xl overflow-hidden border-2 border-[#3C1A11] bg-white shadow-sm cursor-zoom-in"
+              >
+                <img
+                  src={img}
+                  alt={`${product.name} ${selectedFit} view ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "/assets/unora.jpg";
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -217,8 +232,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const shareUrl = window.location.href;
-                    const text = `Check out ${product.name} on Unora: ${shareUrl}`;
+                    const shareUrl = `${window.location.origin}/?id=${product.id}&fit=${selectedFit}&size=${selectedSize}`;
+                    const text = `Check out the ${product.name} (${selectedFit}, Size: ${selectedSize}) on Unora: ${shareUrl}`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
                   }}
                   aria-label="Share on WhatsApp"
@@ -233,7 +248,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigator.clipboard.writeText(window.location.href);
+                    const shareUrl = `${window.location.origin}/?id=${product.id}&fit=${selectedFit}&size=${selectedSize}`;
+                    navigator.clipboard.writeText(shareUrl);
                     setCopiedLink(true);
                     setTimeout(() => setCopiedLink(false), 2200);
                   }}
@@ -251,34 +267,25 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const text = `Check out ${product.name} on Unora`;
-                    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`, "_blank", "noopener,noreferrer");
+                    const baseUrl = window.location.href.split('?')[0];
+                    const shareUrl = `${baseUrl}?id=${product.id}&fit=${selectedFit}&size=${selectedSize}`;
+                    navigator.clipboard.writeText(shareUrl);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2200);
                   }}
-                  aria-label="Share on X"
+                  aria-label="Share on Instagram"
                   className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#3C1A11]/20 bg-white hover:bg-[#3C1A11] hover:text-[#BDF119] transition-all cursor-pointer text-[#3C1A11]"
                 >
-                  <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, "_blank", "noopener,noreferrer");
-                  }}
-                  aria-label="Share on Facebook"
-                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#3C1A11]/20 bg-white hover:bg-[#3C1A11] hover:text-[#BDF119] transition-all cursor-pointer text-[#3C1A11]"
-                >
-                  <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
                   </svg>
                 </button>
 
                 {copiedLink && (
                   <span className="absolute -top-7 left-10 bg-[#3C1A11] text-[#BDF119] text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-md whitespace-nowrap animate-in fade-in">
-                    Link Copied!
+                    Fit Link Copied!
                   </span>
                 )}
               </div>
@@ -343,6 +350,30 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               CLOSE
             </button>
           </div>
+        </div>
+      )}
+
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-[180] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLightboxImg(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxImg(null)}
+            className="absolute top-5 right-5 p-2 rounded-full bg-[#FFF8F0] border-2 border-[#3C1A11] text-[#3C1A11] cursor-pointer"
+            aria-label="Close image"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <img
+            src={lightboxImg}
+            alt={product.name}
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl cursor-default"
+          />
         </div>
       )}
     </div>

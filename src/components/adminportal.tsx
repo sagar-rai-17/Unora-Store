@@ -77,8 +77,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdCampus, setNewProdCampus] = useState(CAMPUSES[1]);
   const [newProdCategory, setNewProdCategory] = useState<"men" | "women" | "unisex">("unisex");
-  const [imgUrls, setImgUrls] = useState(["", "", "", ""]);
-  const [mainImgIdx, setMainImgIdx] = useState(0);
+  const [regularImgUrls, setRegularImgUrls] = useState(["", ""]);
+  const [oversizedImgUrls, setOversizedImgUrls] = useState(["", ""]);
   const [createLoading, setCreateLoading] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
 
@@ -155,17 +155,19 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     e.preventDefault();
     if (!newProdName.trim() || !newProdPrice) return;
 
-    setCreateLoading(true);
+        setCreateLoading(true);
     try {
-      const convertedImgs = imgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
-      const mainImg = convertedImgs[mainImgIdx] || convertedImgs[0] || "/assets/unora.jpg";
-      const finalImgs = [
-        mainImg,
-        ...convertedImgs.filter((_, idx) => idx !== mainImgIdx)
-      ];
-      while (finalImgs.length < 4) {
-        finalImgs.push(mainImg);
-      }
+      const fallbackImg = "/assets/unora.jpg";
+      const convertedRegular = regularImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
+      const convertedOversized = oversizedImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
+
+      const finalRegular = convertedRegular.length > 0 ? [...convertedRegular] : [fallbackImg];
+      while (finalRegular.length < 2) finalRegular.push(finalRegular[0]);
+
+      const finalOversized = convertedOversized.length > 0 ? [...convertedOversized] : [finalRegular[0]];
+      while (finalOversized.length < 2) finalOversized.push(finalOversized[0]);
+
+      const mainImg = finalRegular[0];
 
       const newId = `item-${Date.now().toString().slice(-4)}`;
       const priceNum = Number(newProdPrice);
@@ -179,7 +181,8 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         campus: newProdCampus,
         category: newProdCategory,
         image: mainImg,
-        images: finalImgs,
+        imagesRegular: finalRegular,
+        imagesOversized: finalOversized,
         inStock: true,
         createdAt: new Date().toISOString(),
       });
@@ -187,7 +190,8 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       setCreateSuccess(true);
       setNewProdName("");
       setNewProdPrice("");
-      setImgUrls(["", "", "", ""]);
+      setRegularImgUrls(["", ""]);
+      setOversizedImgUrls(["", ""]);
       setTimeout(() => setCreateSuccess(false), 2500);
     } catch (err) {
       console.error(err);
@@ -380,6 +384,8 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 
     try {
       await updateDoc(doc(db, "inventory", editingItem.id), {
+        name: editingItem.name,
+        campus: editingItem.campus,
         price: Number(editingItem.price),
         originalPrice: Number(editingItem.originalPrice),
         badge: editingItem.badge,
@@ -982,28 +988,45 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 
               <div className="space-y-2 pt-2">
                 <label className="block text-[10px] font-black uppercase">
-                  Product Image URLs (Provide 4 URLs, select radio for primary thumbnail)
+                  Regular-Fit Images (2 URLs)
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[0, 1, 2, 3].map((idx) => (
+                  {[0, 1].map((idx) => (
                     <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
-                      <input
-                        type="radio"
-                        name="mainImageSelection"
-                        checked={mainImgIdx === idx}
-                        onChange={() => setMainImgIdx(idx)}
-                        className="cursor-pointer"
-                      />
                       <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
                       <input
                         type="text"
-                        value={imgUrls[idx]}
+                        value={regularImgUrls[idx]}
                         onChange={(e) => {
-                          const copy = [...imgUrls];
+                          const copy = [...regularImgUrls];
                           copy[idx] = e.target.value;
-                          setImgUrls(copy);
+                          setRegularImgUrls(copy);
                         }}
-                        placeholder={`URL for image ${idx + 1}`}
+                        placeholder={`Regular-fit image ${idx + 1} URL`}
+                        className="flex-1 bg-transparent text-xs font-bold outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <label className="block text-[10px] font-black uppercase">
+                  Oversized-Fit Images (2 URLs)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[0, 1].map((idx) => (
+                    <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
+                      <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={oversizedImgUrls[idx]}
+                        onChange={(e) => {
+                          const copy = [...oversizedImgUrls];
+                          copy[idx] = e.target.value;
+                          setOversizedImgUrls(copy);
+                        }}
+                        placeholder={`Oversized-fit image ${idx + 1} URL`}
                         className="flex-1 bg-transparent text-xs font-bold outline-none"
                       />
                     </div>
@@ -1082,7 +1105,30 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   <button type="button" onClick={() => setEditingItem(null)} className="text-xs font-bold text-[#3C1A11]/60 hover:text-[#3C1A11]">Cancel</button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase mb-1">Product Name</label>
+                    <input
+                      type="text"
+                      value={editingItem.name || ""}
+                      onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase mb-1">Campus</label>
+                    <select
+                      value={editingItem.campus || CAMPUSES[1]}
+                      onChange={(e) => setEditingItem({ ...editingItem, campus: e.target.value })}
+                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+                    >
+                      {CAMPUSES.filter(c => c !== "ALL").map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-[10px] font-black uppercase mb-1">Live Price (₹)</label>
                     <input
@@ -1116,7 +1162,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   <div>
                     <label className="block text-[10px] font-black uppercase mb-1">Stock Status</label>
                     <select
-                      value={editingItem.inStock ? "inStock" : "outOfStock"}
+                      value={editingItem.inStock !== false ? "inStock" : "outOfStock"}
                       onChange={(e) => setEditingItem({ ...editingItem, inStock: e.target.value === "inStock" })}
                       className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
                     >
@@ -1139,7 +1185,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
                     className="px-6 h-10 bg-[#D94F27] hover:bg-[#F47E20] text-white font-black text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
