@@ -14,6 +14,7 @@ export interface Product {
   campus: string;
   category?: "men" | "women" | "unisex";
   inStock?: boolean;
+  isHidden?: boolean;
 }
 
 export const campuses = [
@@ -307,6 +308,7 @@ export const Catalog: React.FC<CatalogProps> = ({
 
   const displayProducts = [...activeProducts]
     .filter((p) => {
+      if (p.isHidden === true) return false;
       if (cleanQuery) {
         const matchesName = p.name.toLowerCase().includes(cleanQuery);
         const matchesCampus = p.campus.toLowerCase().includes(cleanQuery);

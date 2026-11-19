@@ -402,6 +402,26 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     }
   };
 
+  const handleToggleVisibility = async (item: any) => {
+    try {
+      await updateDoc(doc(db, "inventory", item.id), {
+        isHidden: !item.isHidden,
+      });
+    } catch (err) {
+      console.error("Failed to toggle visibility:", err);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (!window.confirm(`Permanently delete "${name}" from inventory?`)) return;
+    try {
+      await deleteDoc(doc(db, "inventory", id));
+      if (editingItem?.id === id) setEditingItem(null);
+    } catch (err) {
+      console.error("Failed to delete product:", err);
+    }
+  };
+
   const handleStatusChange = async (docId: string, newStatus: OrderStatus) => {
     try {
       setUpdatingId(docId);
@@ -1210,35 +1230,69 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 </thead>
                 <tbody className="divide-y divide-[#3C1A11]/10">
                   {inventory.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#FFF8F0]/70">
-                      <td className="py-3 px-4 flex items-center gap-2">
-                        <img src={item.image} alt={item.name} className="w-8 h-10 object-cover rounded" />
-                        <span className="font-bold text-xs">{item.name}</span>
-                      </td>
-                      <td className="py-3 px-4 font-bold">{item.campus}</td>
-                      <td className="py-3 px-4">
-                        <span className="font-anton text-sm">₹{item.price}</span>
-                        <s className="text-[#3C1A11]/40 ml-1.5">₹{item.originalPrice}</s>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="bg-[#3C1A11]/10 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{item.badge}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${item.inStock !== false ? "bg-[#BDF119]/30 text-[#3C1A11]" : "bg-[#D94F27]/20 text-[#D94F27]"}`}>
-                          {item.inStock !== false ? "In Stock" : "Sold Out"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setEditingItem(item)}
-                          className="px-3 py-1 bg-[#3C1A11] hover:bg-[#D94F27] text-[#BDF119] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+  <tr
+    key={item.id}
+    className={`hover:bg-[#FFF8F0]/70 ${item.isHidden ? "opacity-50" : ""}`}
+  >
+    <td className="py-3 px-4 flex items-center gap-2">
+      <img src={item.image} alt={item.name} className="w-8 h-10 object-cover rounded" />
+      <span className="font-bold text-xs">{item.name}</span>
+    </td>
+    <td className="py-3 px-4 font-bold">{item.campus}</td>
+    <td className="py-3 px-4">
+      <span className="font-anton text-sm">₹{item.price}</span>
+      <s className="text-[#3C1A11]/40 ml-1.5">₹{item.originalPrice}</s>
+    </td>
+    <td className="py-3 px-4">
+      <span className="bg-[#3C1A11]/10 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+        {item.badge}
+      </span>
+    </td>
+    <td className="py-3 px-4 space-x-1">
+      <span
+        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+          item.inStock !== false
+            ? "bg-[#BDF119]/30 text-[#3C1A11]"
+            : "bg-[#D94F27]/20 text-[#D94F27]"
+        }`}
+      >
+        {item.inStock !== false ? "In Stock" : "Sold Out"}
+      </span>
+      {item.isHidden && (
+        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#3C1A11] text-[#FFE2C7]">
+          Hidden
+        </span>
+      )}
+    </td>
+    <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+      <button
+        type="button"
+        onClick={() => handleToggleVisibility(item)}
+        className={`px-2.5 py-1 rounded font-bold text-[10px] uppercase cursor-pointer transition-all ${
+          item.isHidden
+            ? "bg-[#2952CC] text-white hover:bg-[#3C1A11]"
+            : "bg-[#3C1A11]/15 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+        }`}
+      >
+        {item.isHidden ? "Show" : "Hide"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setEditingItem(item)}
+        className="px-2.5 py-1 bg-[#3C1A11] hover:bg-[#D94F27] text-[#BDF119] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer"
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        onClick={() => handleDeleteProduct(item.id, item.name)}
+        className="px-2.5 py-1 bg-[#D94F27]/15 text-[#D94F27] hover:bg-[#D94F27] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer transition-all"
+      >
+        Delete
+      </button>
+    </td>
+  </tr>
+))}
                 </tbody>
               </table>
             </div>
