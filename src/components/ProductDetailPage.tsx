@@ -74,8 +74,17 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           ? urlFit
           : defaultFit;
 
-      const validSizes = validFit === "Oversized-fit" ? OVERSIZED_SIZES : REGULAR_SIZES;
-      const validSize = urlSize && validSizes.includes(urlSize) ? urlSize : "L";
+      const baseFitSizes = validFit === "Oversized-fit" ? OVERSIZED_SIZES : REGULAR_SIZES;
+  const validSizes =
+    Array.isArray(product.availableSizes) && product.availableSizes.length > 0
+      ? baseFitSizes.filter((sz) => product.availableSizes!.includes(sz))
+      : baseFitSizes;
+  const validSize =
+    urlSize && validSizes.includes(urlSize)
+      ? urlSize
+      : validSizes.includes("L")
+      ? "L"
+      : validSizes[0] || "L";
 
       setSelectedFit(validFit);
       setSelectedSize(validSize);
@@ -85,7 +94,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   if (!isOpen || !product) return null;
 
-  const availableSizes = selectedFit === "Oversized-fit" ? OVERSIZED_SIZES : REGULAR_SIZES;
+  const fitSizes = selectedFit === "Oversized-fit" ? OVERSIZED_SIZES : REGULAR_SIZES;
+  const availableSizes =
+    Array.isArray(product.availableSizes) && product.availableSizes.length > 0
+      ? fitSizes.filter((sz) => product.availableSizes!.includes(sz))
+      : fitSizes;
 
   const handleFitChange = (fit: "Regular-fit" | "Oversized-fit") => {
     setSelectedFit(fit);

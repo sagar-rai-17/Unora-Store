@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebaseConfig";
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, deleteDoc, updateDoc, increment } from "firebase/firestore";
 import emailjs from "@emailjs/browser";
 
 import { Navbar } from "./components/Navbar";
@@ -151,9 +151,12 @@ export default function App() {
           if (userDoc.exists()) {
             const data = userDoc.data();
             finalName = ((data.firstName || "") + " " + (data.lastName || "")).trim();
-            
-            if (Array.isArray(data.cart)) {
+
+            if (!adminStatus && Array.isArray(data.cart)) {
               setCartItems(data.cart);
+            } else if (adminStatus) {
+              setCartItems([]);
+              localStorage.removeItem("unora_cart");
             }
           }
           
@@ -190,6 +193,8 @@ export default function App() {
         setIsAdmin(false);
         setOrders([]);
         setWishlistItems([]);
+        setCartItems([]);
+        localStorage.removeItem("unora_cart");
         if (unsubscribeOrders) unsubscribeOrders();
       }
       setAuthResolved(true);
@@ -289,6 +294,7 @@ export default function App() {
     color?: string;
     style?: string;
     quantity: number;
+    studioDesign?: any;
   }) => {
     if (!isLoggedIn || !auth.currentUser) {
       setToastMessage("Please Sign In to start your campus collection.");
@@ -320,6 +326,7 @@ export default function App() {
       campus: customItem.campus || "CAMPUS SPECIAL",
       image: customItem.image || "/assets/unora.jpg",
       quantity: customItem.quantity,
+      ...(customItem.studioDesign ? { studioDesign: customItem.studioDesign } : {}),
     };
     setCartItems((prev) => [...prev, newItem]);
     setToastMessage(`Added ${customItem.name} to Bag`);
@@ -455,7 +462,12 @@ export default function App() {
         <Hero />
         <Catalog
           products={inventoryProducts}
-          onOpenDetail={(product) => setSelectedDetailProduct(product)}
+          onOpenDetail={(product) => {
+            setSelectedDetailProduct(product);
+            updateDoc(doc(db, "inventory", product.id), {
+              clicks: increment(1),
+            }).catch(() => {});
+          }}
           wishlistItems={wishlistItems}
           onToggleWishlist={handleToggleWishlist}
           searchQuery={searchQuery}
@@ -497,6 +509,7 @@ export default function App() {
               campus: studioProduct?.campus || "CAMPUS SPECIAL",
               color: "Default",
               style: "Custom",
+              studioDesign: item.studioDesign,
             });
             setStudioProduct(null);
           }}

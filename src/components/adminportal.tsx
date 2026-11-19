@@ -20,6 +20,8 @@ const CAMPUSES = [
   "IIT (ISM) Dhanbad",
 ];
 
+const ALL_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+
 const ORDER_STATUSES = [
   "Received",
   "In Transit",
@@ -77,6 +79,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdCampus, setNewProdCampus] = useState(CAMPUSES[1]);
   const [newProdCategory, setNewProdCategory] = useState<"men" | "women" | "unisex">("unisex");
+  const [newProdType, setNewProdType] = useState<"t-shirt" | "hoodie" | "sweatshirt" | "jacket">("t-shirt");
+  const [newProdSizes, setNewProdSizes] = useState<string[]>(ALL_SIZES);
   const [regularImgUrls, setRegularImgUrls] = useState(["", ""]);
   const [oversizedImgUrls, setOversizedImgUrls] = useState(["", ""]);
   const [newProdFitType, setNewProdFitType] = useState<"both" | "regular" | "oversized">("both");
@@ -92,6 +96,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [reelLoading, setReelLoading] = useState(false);
   const [showReelsOnHome, setShowReelsOnHome] = useState(false);
 const [reelsSettingSuccess, setReelsSettingSuccess] = useState(false);
+const [newProdStudioImg, setNewProdStudioImg] = useState("");
+const [previewDesign, setPreviewDesign] = useState<any | null>(null);
 
 useEffect(() => {
   if (!isOpen) return;
@@ -193,8 +199,12 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         hasOversized: newProdFitType !== "regular",
         inStock: true,
         createdAt: new Date().toISOString(),
+        studioImage: newProdStudioImg.trim() ? convertGoogleDriveUrl(newProdStudioImg) : mainImg,
+        productType: newProdType,
+        availableSizes: newProdSizes.length > 0 ? newProdSizes : ALL_SIZES,
       });
 
+      setNewProdStudioImg("");
       setCreateSuccess(true);
       setNewProdName("");
       setNewProdPrice("");
@@ -405,6 +415,11 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         category: editingItem.category || "unisex",
         fitType: resolvedFitType,
         hasOversized: resolvedFitType !== "regular",
+        studioImage: editingItem.studioImage ? convertGoogleDriveUrl(editingItem.studioImage) : editingItem.image,
+        productType: editingItem.productType || "t-shirt",
+        availableSizes: Array.isArray(editingItem.availableSizes) && editingItem.availableSizes.length > 0
+  ? editingItem.availableSizes
+  : ALL_SIZES,
       });
       setSaveSuccess(true);
       setTimeout(() => {
@@ -450,6 +465,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem("unora_cart");
       await signOut(auth);
       onClose();
     } catch (err) {
@@ -867,6 +883,15 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                               {item.customText && item.customText.trim() !== "" && (
                                 <div className="mt-1 bg-[#D94F27]/10 border border-[#D94F27] px-2 py-0.5 rounded text-[11px] font-black text-[#D94F27] uppercase tracking-wider inline-block">
                                   STUDIO PRINT: "{item.customText}"
+                                  {(item as any).studioDesign && (
+  <button
+    type="button"
+    onClick={() => setPreviewDesign((item as any).studioDesign)}
+    className="mt-1 ml-2 px-2 py-0.5 rounded bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
+  >
+    View Design
+  </button>
+)}
                                 </div>
                               )}
                             </div>
@@ -967,7 +992,32 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 <h3 className="font-anton text-xl uppercase text-[#3C1A11]">Add New Campus Garment</h3>
                 {createSuccess && <span className="text-xs font-black text-[#BDF119] bg-[#3C1A11] px-2 py-1 rounded uppercase">Product Added Live!</span>}
               </div>
+              <div className="space-y-1.5 pt-2">
+  <label className="block text-[10px] font-black uppercase">
+    Unora Studio Image (Google Drive URL — Single Blank/Back Image)
+  </label>
+  <input
+    type="text"
+    value={newProdStudioImg}
+    onChange={(e) => setNewProdStudioImg(e.target.value)}
+    placeholder="Paste Google Drive link for Studio customizer"
+    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-[#FFF8F0] text-xs font-bold outline-none"
+  />
+</div>
 
+              <div>
+  <label className="block text-[10px] font-black uppercase mb-1">Garment Type</label>
+  <select
+    value={newProdType}
+    onChange={(e) => setNewProdType(e.target.value as any)}
+    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] text-xs font-bold outline-none cursor-pointer"
+  >
+    <option value="t-shirt">T-Shirt</option>
+    <option value="hoodie">Hoodie</option>
+    <option value="sweatshirt">Sweatshirt</option>
+    <option value="jacket">Jacket</option>
+  </select>
+</div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase mb-1">Product Name</label>
@@ -1020,30 +1070,6 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2">
-                <label className="block text-[10px] font-black uppercase">
-                  Regular-Fit Images (2 URLs)
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[0, 1].map((idx) => (
-                    <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
-                      <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
-                      <input
-                        type="text"
-                        value={regularImgUrls[idx]}
-                        onChange={(e) => {
-                          const copy = [...regularImgUrls];
-                          copy[idx] = e.target.value;
-                          setRegularImgUrls(copy);
-                        }}
-                        placeholder={`Regular-fit image ${idx + 1} URL`}
-                        className="flex-1 bg-transparent text-xs font-bold outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="pt-2">
                 <label className="block text-[10px] font-black uppercase mb-1">Fit Options</label>
                 <select
@@ -1057,6 +1083,32 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 </select>
               </div>
 
+              <div className="space-y-1.5 pt-2">
+  <label className="block text-[10px] font-black uppercase">Available Sizes</label>
+  <div className="flex flex-wrap gap-2">
+    {ALL_SIZES.map((sz) => {
+      const active = newProdSizes.includes(sz);
+      return (
+        <button
+          key={sz}
+          type="button"
+          onClick={() =>
+            setNewProdSizes((prev) =>
+              prev.includes(sz) ? prev.filter((s) => s !== sz) : [...prev, sz]
+            )
+          }
+          className={`px-3 py-1.5 rounded-lg border-2 text-xs font-black uppercase cursor-pointer transition-all ${
+            active
+              ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+              : "bg-white border-[#3C1A11]/20 text-[#3C1A11]/40"
+          }`}
+        >
+          {sz}
+        </button>
+      );
+    })}
+  </div>
+</div>
               {(newProdFitType === "both" || newProdFitType === "regular") && (
                 <div className="space-y-2 pt-2">
                   <label className="block text-[10px] font-black uppercase">
@@ -1179,6 +1231,31 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   <h3 className="font-anton text-xl uppercase text-[#3C1A11]">Editing: {editingItem.name}</h3>
                   <button type="button" onClick={() => setEditingItem(null)} className="text-xs font-bold text-[#3C1A11]/60 hover:text-[#3C1A11]">Cancel</button>
                 </div>
+                <div className="space-y-1.5 pt-2">
+  <label className="block text-[10px] font-black uppercase">
+    Unora Studio Image (Google Drive URL — Single Blank/Back Image)
+  </label>
+  <input
+  type="text"
+  value={editingItem.studioImage || ""}
+  onChange={(e) => setEditingItem({ ...editingItem, studioImage: e.target.value })}
+  placeholder="Paste Google Drive link for Studio customizer"
+  className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
+/>
+</div>
+                <div>
+  <label className="block text-[10px] font-black uppercase mb-1">Garment Type</label>
+  <select
+    value={editingItem.productType || "t-shirt"}
+    onChange={(e) => setEditingItem({ ...editingItem, productType: e.target.value })}
+    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+  >
+    <option value="t-shirt">T-Shirt</option>
+    <option value="hoodie">Hoodie</option>
+    <option value="sweatshirt">Sweatshirt</option>
+    <option value="jacket">Jacket</option>
+  </select>
+</div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
@@ -1279,6 +1356,36 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   </div>
                 </div>
 
+                <div className="space-y-1.5 pt-1">
+  <label className="block text-[10px] font-black uppercase">Available Sizes</label>
+  <div className="flex flex-wrap gap-2">
+    {ALL_SIZES.map((sz) => {
+      const currentSizes: string[] = Array.isArray(editingItem.availableSizes)
+        ? editingItem.availableSizes
+        : ALL_SIZES;
+      const active = currentSizes.includes(sz);
+      return (
+        <button
+          key={sz}
+          type="button"
+          onClick={() => {
+            const nextSizes = active
+              ? currentSizes.filter((s) => s !== sz)
+              : [...currentSizes, sz];
+            setEditingItem({ ...editingItem, availableSizes: nextSizes });
+          }}
+          className={`px-3 py-1.5 rounded-lg border-2 text-xs font-black uppercase cursor-pointer transition-all ${
+            active
+              ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+              : "bg-white border-[#3C1A11]/20 text-[#3C1A11]/40"
+          }`}
+        >
+          {sz}
+        </button>
+      );
+    })}
+  </div>
+</div>
                 <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
@@ -1373,6 +1480,56 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
           </section>
         )}
       </main>
+
+      {previewDesign && (
+        <div
+          className="fixed inset-0 z-[160] bg-black/75 flex items-center justify-center p-4"
+          onClick={() => setPreviewDesign(null)}
+        >
+          <div
+            className="max-w-2xl w-full bg-[#FFF8F0] border-2 border-[#3C1A11] rounded-3xl p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center">
+              <h3 className="font-anton text-xl uppercase">Studio Print Preview</h3>
+              <button
+                type="button"
+                onClick={() => setPreviewDesign(null)}
+                className="font-black text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="relative w-full rounded-2xl overflow-hidden border-2 border-[#3C1A11] bg-white">
+              <img
+                src={previewDesign.studioImage}
+                alt="Studio Print"
+                className="w-full h-auto block"
+              />
+              <div
+                style={{
+                  left: `${previewDesign.x}%`,
+                  top: `${previewDesign.y}%`,
+                  transform: "translate(-50%, -50%)",
+                  fontFamily: previewDesign.font,
+                  color: previewDesign.color,
+                  fontSize: `${previewDesign.fontSize}px`,
+                  lineHeight: 1.15,
+                }}
+                className="absolute whitespace-pre-wrap text-center font-bold tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]"
+              >
+                {previewDesign.text}
+              </div>
+            </div>
+            <div className="text-xs font-bold space-y-1 bg-white p-3 rounded-xl border border-[#3C1A11]/20">
+              <p>Text: <span className="text-[#D94F27]">{previewDesign.text}</span></p>
+              <p>Font: {previewDesign.font}</p>
+              <p>Color: {previewDesign.color} | Size: {previewDesign.fontSize}px</p>
+              <p>Position: X {previewDesign.x}% / Y {previewDesign.y}%</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

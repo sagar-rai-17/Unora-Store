@@ -17,6 +17,10 @@ export interface Product {
   isHidden?: boolean;
   hasOversized?: boolean;
   fitType?: "both" | "regular" | "oversized";
+  studioImage?: string;
+  clicks?: number;
+  productType?: "t-shirt" | "hoodie" | "sweatshirt" | "jacket";
+  availableSizes?: string[];
 }
 
 
@@ -313,10 +317,16 @@ export const Catalog: React.FC<CatalogProps> = ({
     .filter((p) => {
       if (p.isHidden === true) return false;
       if (cleanQuery) {
+        const normalizedQuery = cleanQuery.replace(/[-\s]/g, "");
         const matchesName = p.name.toLowerCase().includes(cleanQuery);
         const matchesCampus = p.campus.toLowerCase().includes(cleanQuery);
         const matchesBadge = p.badge.toLowerCase().includes(cleanQuery);
-        return matchesName || matchesCampus || matchesBadge;
+        const matchesType =
+          (p.productType || "").toLowerCase().replace(/[-\s]/g, "").includes(normalizedQuery) ||
+          (normalizedQuery.includes("tshirt") &&
+            (p.productType === "t-shirt" || p.name.toLowerCase().includes("tee")));
+
+        return matchesName || matchesCampus || matchesBadge || matchesType;
       }
 
       if (selectedCategory !== "all") {
@@ -337,17 +347,41 @@ export const Catalog: React.FC<CatalogProps> = ({
         }
       }
 
-      if (filter === "T-shirts") return p.name.toLowerCase().includes("tee");
-      if (filter === "Hoodies")
+      if (filter === "T-shirts") {
+        if (p.productType) return p.productType === "t-shirt";
+        return (
+          p.name.toLowerCase().includes("tee") ||
+          p.name.toLowerCase().includes("t-shirt") ||
+          p.name.toLowerCase().includes("tshirt")
+        );
+      }
+      if (filter === "Hoodies") {
+        if (p.productType) {
+          return ["hoodie", "sweatshirt", "jacket"].includes(p.productType);
+        }
         return (
           p.name.toLowerCase().includes("hood") ||
           p.name.toLowerCase().includes("sweatshirt") ||
           p.name.toLowerCase().includes("jacket")
         );
+      }
       if (filter === "Under ₹999") return p.price <= 999;
       return true;
     })
     .sort((a, b) => {
+      if (sort === "Trending") {
+        return (b.clicks || 0) - (a.clicks || 0);
+      }
+      if (sort === "Price: Low to High") {
+        return a.price - b.price;
+      }
+      if (sort === "Price: High to Low") {
+        return b.price - a.price;
+      }
+      if (sort === "New Arrivals") {
+        return b.id.localeCompare(a.id);
+      }
+
       if (selectedCategory === "men") {
         const aIsDirect = (a.category || "unisex").toLowerCase() === "men" ? 1 : 0;
         const bIsDirect = (b.category || "unisex").toLowerCase() === "men" ? 1 : 0;

@@ -15,6 +15,7 @@ export interface CartItem {
   image: string;
   quantity: number;
   customText?: string;
+  studioDesign?: any;
 }
 
 interface CartSidebarProps {

@@ -105,6 +105,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
           basePrice: it.basePrice,
           customFee: it.customFee || 0,
           customText: it.customText || "",
+          ...(it.studioDesign ? { studioDesign: it.studioDesign } : {}),
         })),
         grandTotal: grandTotal,
         status: "Received",
