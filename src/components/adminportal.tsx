@@ -81,8 +81,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [newProdCategory, setNewProdCategory] = useState<"men" | "women" | "unisex">("unisex");
   const [newProdType, setNewProdType] = useState<"t-shirt" | "hoodie" | "sweatshirt" | "jacket">("t-shirt");
   const [newProdSizes, setNewProdSizes] = useState<string[]>(ALL_SIZES);
-  const [regularImgUrls, setRegularImgUrls] = useState(["", ""]);
-  const [oversizedImgUrls, setOversizedImgUrls] = useState(["", ""]);
+  const [regularImgUrls, setRegularImgUrls] = useState<string[]>([""]);
+  const [oversizedImgUrls, setOversizedImgUrls] = useState<string[]>([""]);
+  const [newProdThumbnail, setNewProdThumbnail] = useState<string>("");
   const [newProdFitType, setNewProdFitType] = useState<"both" | "regular" | "oversized">("both");
   const [createLoading, setCreateLoading] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
@@ -169,18 +170,17 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       let finalOversized: string[] = [];
 
       if (newProdFitType === "both" || newProdFitType === "regular") {
-        const convertedRegular = regularImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
-        finalRegular = convertedRegular.length > 0 ? [...convertedRegular] : [fallbackImg];
-        while (finalRegular.length < 2) finalRegular.push(finalRegular[0]);
+        const convertedRegular = regularImgUrls.map((u) => convertGoogleDriveUrl(u)).filter(Boolean);
+        finalRegular = convertedRegular.length > 0 ? convertedRegular : [fallbackImg];
       }
 
       if (newProdFitType === "both" || newProdFitType === "oversized") {
-        const convertedOversized = oversizedImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
-        finalOversized = convertedOversized.length > 0 ? [...convertedOversized] : [finalRegular[0] || fallbackImg];
-        while (finalOversized.length < 2) finalOversized.push(finalOversized[0]);
+        const convertedOversized = oversizedImgUrls.map((u) => convertGoogleDriveUrl(u)).filter(Boolean);
+        finalOversized = convertedOversized.length > 0 ? convertedOversized : [finalRegular[0] || fallbackImg];
       }
 
-      const mainImg = finalRegular[0] || finalOversized[0] || fallbackImg;
+      const convertedThumb = newProdThumbnail.trim() ? convertGoogleDriveUrl(newProdThumbnail) : "";
+      const mainImg = convertedThumb || finalRegular[0] || finalOversized[0] || fallbackImg;
       const newId = `item-${Date.now().toString().slice(-4)}`;
       const priceNum = Number(newProdPrice);
 
@@ -205,12 +205,14 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       });
 
       setNewProdStudioImg("");
+      setNewProdThumbnail("");
       setCreateSuccess(true);
       setNewProdName("");
       setNewProdPrice("");
-      setRegularImgUrls(["", ""]);
-      setOversizedImgUrls(["", ""]);
+      setRegularImgUrls([""]);
+      setOversizedImgUrls([""]);
       setNewProdFitType("both");
+      setNewProdSizes(ALL_SIZES);
       setTimeout(() => setCreateSuccess(false), 2500);
     } catch (err) {
       console.error(err);
@@ -403,6 +405,20 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 
     const resolvedFitType =
       editingItem.fitType || (editingItem.hasOversized === false ? "regular" : "both");
+    const fallbackImg = "/assets/unora.jpg";
+
+    const finalRegular =
+      resolvedFitType === "both" || resolvedFitType === "regular"
+        ? (editingItem.imagesRegular || []).map((u: string) => convertGoogleDriveUrl(u)).filter(Boolean)
+        : [];
+
+    const finalOversized =
+      resolvedFitType === "both" || resolvedFitType === "oversized"
+        ? (editingItem.imagesOversized || []).map((u: string) => convertGoogleDriveUrl(u)).filter(Boolean)
+        : [];
+
+    const convertedThumb = editingItem.image ? convertGoogleDriveUrl(editingItem.image) : "";
+    const mainImg = convertedThumb || finalRegular[0] || finalOversized[0] || fallbackImg;
 
     try {
       await updateDoc(doc(db, "inventory", editingItem.id), {
@@ -415,11 +431,15 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         category: editingItem.category || "unisex",
         fitType: resolvedFitType,
         hasOversized: resolvedFitType !== "regular",
-        studioImage: editingItem.studioImage ? convertGoogleDriveUrl(editingItem.studioImage) : editingItem.image,
+        image: mainImg,
+        imagesRegular: finalRegular.length > 0 ? finalRegular : [mainImg],
+        imagesOversized: finalOversized.length > 0 ? finalOversized : [mainImg],
+        studioImage: editingItem.studioImage ? convertGoogleDriveUrl(editingItem.studioImage) : mainImg,
         productType: editingItem.productType || "t-shirt",
-        availableSizes: Array.isArray(editingItem.availableSizes) && editingItem.availableSizes.length > 0
-  ? editingItem.availableSizes
-  : ALL_SIZES,
+        availableSizes:
+          Array.isArray(editingItem.availableSizes) && editingItem.availableSizes.length > 0
+            ? editingItem.availableSizes
+            : ALL_SIZES,
       });
       setSaveSuccess(true);
       setTimeout(() => {
@@ -1111,52 +1131,120 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 </div>
               {(newProdFitType === "both" || newProdFitType === "regular") && (
                 <div className="space-y-2 pt-2">
-                  <label className="block text-[10px] font-black uppercase">
-                    Regular-Fit Images (2 URLs)
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[0, 1].map((idx) => (
-                      <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
-                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
-                        <input
-                          type="text"
-                          value={regularImgUrls[idx]}
-                          onChange={(e) => {
-                            const copy = [...regularImgUrls];
-                            copy[idx] = e.target.value;
-                            setRegularImgUrls(copy);
-                          }}
-                          placeholder={`Regular-fit image ${idx + 1} URL`}
-                          className="flex-1 bg-transparent text-xs font-bold outline-none"
-                        />
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-black uppercase">
+                      Regular-Fit Images ({regularImgUrls.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setRegularImgUrls([...regularImgUrls, ""])}
+                      className="px-2.5 py-1 rounded-lg bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
+                    >
+                      + Add Image
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {regularImgUrls.map((url, idx) => {
+                      const isThumb = Boolean(url.trim()) && newProdThumbnail === url;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
+                          <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                          <input
+                            type="text"
+                            value={url}
+                            onChange={(e) => {
+                              const copy = [...regularImgUrls];
+                              copy[idx] = e.target.value;
+                              setRegularImgUrls(copy);
+                            }}
+                            placeholder={`Regular-fit image ${idx + 1} URL`}
+                            className="flex-1 bg-transparent text-xs font-bold outline-none"
+                          />
+                          {url.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => setNewProdThumbnail(url)}
+                              className={`px-2 py-1 rounded text-[9px] font-black uppercase cursor-pointer whitespace-nowrap ${
+                                isThumb
+                                  ? "bg-[#BDF119] text-[#3C1A11]"
+                                  : "bg-[#3C1A11]/10 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+                              }`}
+                            >
+                              {isThumb ? "★ Thumbnail" : "Set Thumb"}
+                            </button>
+                          )}
+                          {regularImgUrls.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setRegularImgUrls(regularImgUrls.filter((_, i) => i !== idx))}
+                              className="px-2 py-1 text-xs font-black text-[#D94F27] cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               {(newProdFitType === "both" || newProdFitType === "oversized") && (
                 <div className="space-y-2 pt-2">
-                  <label className="block text-[10px] font-black uppercase">
-                    Oversized-Fit Images (2 URLs)
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[0, 1].map((idx) => (
-                      <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
-                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
-                        <input
-                          type="text"
-                          value={oversizedImgUrls[idx]}
-                          onChange={(e) => {
-                            const copy = [...oversizedImgUrls];
-                            copy[idx] = e.target.value;
-                            setOversizedImgUrls(copy);
-                          }}
-                          placeholder={`Oversized-fit image ${idx + 1} URL`}
-                          className="flex-1 bg-transparent text-xs font-bold outline-none"
-                        />
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-black uppercase">
+                      Oversized-Fit Images ({oversizedImgUrls.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setOversizedImgUrls([...oversizedImgUrls, ""])}
+                      className="px-2.5 py-1 rounded-lg bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
+                    >
+                      + Add Image
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {oversizedImgUrls.map((url, idx) => {
+                      const isThumb = Boolean(url.trim()) && newProdThumbnail === url;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
+                          <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                          <input
+                            type="text"
+                            value={url}
+                            onChange={(e) => {
+                              const copy = [...oversizedImgUrls];
+                              copy[idx] = e.target.value;
+                              setOversizedImgUrls(copy);
+                            }}
+                            placeholder={`Oversized-fit image ${idx + 1} URL`}
+                            className="flex-1 bg-transparent text-xs font-bold outline-none"
+                          />
+                          {url.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => setNewProdThumbnail(url)}
+                              className={`px-2 py-1 rounded text-[9px] font-black uppercase cursor-pointer whitespace-nowrap ${
+                                isThumb
+                                  ? "bg-[#BDF119] text-[#3C1A11]"
+                                  : "bg-[#3C1A11]/10 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+                              }`}
+                            >
+                              {isThumb ? "★ Thumbnail" : "Set Thumb"}
+                            </button>
+                          )}
+                          {oversizedImgUrls.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setOversizedImgUrls(oversizedImgUrls.filter((_, i) => i !== idx))}
+                              className="px-2 py-1 text-xs font-black text-[#D94F27] cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1386,6 +1474,146 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     })}
   </div>
 </div>
+                {((editingItem.fitType || (editingItem.hasOversized === false ? "regular" : "both")) !== "oversized") && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-black uppercase">
+                        Regular-Fit Images ({(editingItem.imagesRegular || []).length})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingItem({
+                            ...editingItem,
+                            imagesRegular: [...(editingItem.imagesRegular || []), ""],
+                          })
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
+                      >
+                        + Add Image
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {(editingItem.imagesRegular || [""]).map((url: string, idx: number) => {
+                        const isThumb = Boolean(url.trim()) && editingItem.image === url;
+                        return (
+                          <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-white">
+                            <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                            <input
+                              type="text"
+                              value={url}
+                              onChange={(e) => {
+                                const copy = [...(editingItem.imagesRegular || [])];
+                                copy[idx] = e.target.value;
+                                setEditingItem({ ...editingItem, imagesRegular: copy });
+                              }}
+                              placeholder={`Regular-fit image ${idx + 1} URL`}
+                              className="flex-1 bg-transparent text-xs font-bold outline-none"
+                            />
+                            {url.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingItem({ ...editingItem, image: url })}
+                                className={`px-2 py-1 rounded text-[9px] font-black uppercase cursor-pointer whitespace-nowrap ${
+                                  isThumb
+                                    ? "bg-[#BDF119] text-[#3C1A11]"
+                                    : "bg-[#3C1A11]/10 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+                                }`}
+                              >
+                                {isThumb ? "★ Thumbnail" : "Set Thumb"}
+                              </button>
+                            )}
+                            {(editingItem.imagesRegular || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingItem({
+                                    ...editingItem,
+                                    imagesRegular: editingItem.imagesRegular.filter((_: string, i: number) => i !== idx),
+                                  })
+                                }
+                                className="px-2 py-1 text-xs font-black text-[#D94F27] cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {((editingItem.fitType || (editingItem.hasOversized === false ? "regular" : "both")) !== "regular") && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-black uppercase">
+                        Oversized-Fit Images ({(editingItem.imagesOversized || []).length})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingItem({
+                            ...editingItem,
+                            imagesOversized: [...(editingItem.imagesOversized || []), ""],
+                          })
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
+                      >
+                        + Add Image
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {(editingItem.imagesOversized || [""]).map((url: string, idx: number) => {
+                        const isThumb = Boolean(url.trim()) && editingItem.image === url;
+                        return (
+                          <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-white">
+                            <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                            <input
+                              type="text"
+                              value={url}
+                              onChange={(e) => {
+                                const copy = [...(editingItem.imagesOversized || [])];
+                                copy[idx] = e.target.value;
+                                setEditingItem({ ...editingItem, imagesOversized: copy });
+                              }}
+                              placeholder={`Oversized-fit image ${idx + 1} URL`}
+                              className="flex-1 bg-transparent text-xs font-bold outline-none"
+                            />
+                            {url.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingItem({ ...editingItem, image: url })}
+                                className={`px-2 py-1 rounded text-[9px] font-black uppercase cursor-pointer whitespace-nowrap ${
+                                  isThumb
+                                    ? "bg-[#BDF119] text-[#3C1A11]"
+                                    : "bg-[#3C1A11]/10 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+                                }`}
+                              >
+                                {isThumb ? "★ Thumbnail" : "Set Thumb"}
+                              </button>
+                            )}
+                            {(editingItem.imagesOversized || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingItem({
+                                    ...editingItem,
+                                    imagesOversized: editingItem.imagesOversized.filter((_: string, i: number) => i !== idx),
+                                  })
+                                }
+                                className="px-2 py-1 text-xs font-black text-[#D94F27] cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
@@ -1459,7 +1687,19 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       </button>
       <button
         type="button"
-        onClick={() => setEditingItem(item)}
+        onClick={() =>
+          setEditingItem({
+            ...item,
+            imagesRegular:
+              Array.isArray(item.imagesRegular) && item.imagesRegular.length > 0
+                ? [...item.imagesRegular]
+                : [item.image || ""],
+            imagesOversized:
+              Array.isArray(item.imagesOversized) && item.imagesOversized.length > 0
+                ? [...item.imagesOversized]
+                : [item.image || ""],
+          })
+        }
         className="px-2.5 py-1 bg-[#3C1A11] hover:bg-[#D94F27] text-[#BDF119] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer"
       >
         Edit

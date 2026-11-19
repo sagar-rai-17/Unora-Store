@@ -27,19 +27,16 @@ export interface UnoraStudioProps {
   }) => void;
 }
 
-const FONTS = [
-  { label: "Street Bold", value: "'Anton', sans-serif" },
-  { label: "Clean Sans", value: "sans-serif" },
-  { label: "Tech Mono", value: "monospace" },
-  { label: "Classic Serif", value: "Georgia, serif" },
-];
+const STUDIO_FONT = "'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif";
 
 const COLORS = [
   { label: "White", value: "#FFFFFF" },
   { label: "Black", value: "#111111" },
-  { label: "Neon Lime", value: "#BDF119" },
-  { label: "Burnt Orange", value: "#D94F27" },
+  { label: "Dark Brown", value: "#3C1A11" },
   { label: "Cream", value: "#FFE2C7" },
+  { label: "Burnt Orange", value: "#D94F27" },
+  { label: "Neon Lime", value: "#BDF119" },
+  { label: "Campus Blue", value: "#2952CC" },
   { label: "Gold", value: "#FACC15" },
 ];
 
@@ -52,8 +49,8 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
   onAddToBag,
 }) => {
   const [text, setText] = useState("");
-  const [font, setFont] = useState(FONTS[0].value);
   const [color, setColor] = useState(COLORS[0].value);
+  const [hexInput, setHexInput] = useState(COLORS[0].value);
   const [fontSize, setFontSize] = useState(22);
   const [posX, setPosX] = useState(72);
   const [posY, setPosY] = useState(45);
@@ -84,6 +81,21 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
 
   const studioImg = baseProduct.studioImage || baseProduct.image;
   const customFee = 299;
+
+  const selectColor = (hex: string) => {
+    const upper = hex.toUpperCase();
+    setColor(upper);
+    setHexInput(upper);
+  };
+
+  const handleHexChange = (val: string) => {
+    const clean = val.startsWith("#") ? val : `#${val}`;
+    const formatted = clean.toUpperCase().slice(0, 7);
+    setHexInput(formatted);
+    if (/^#([0-9A-F]{3}|[0-9A-F]{6})$/.test(formatted)) {
+      setColor(formatted);
+    }
+  };
 
   const handleBoxPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -147,7 +159,7 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
         ? {
             studioImage: studioImg,
             text: cleanText,
-            font,
+            font: STUDIO_FONT,
             color,
             fontSize,
             x: posX,
@@ -168,7 +180,7 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
         >
           ✕ Close
         </button>
-        <span className="font-anton text-2xl uppercase">UNORA CUSTOM LAB</span>
+        <span className="font-anton text-2xl uppercase">UNORA STUDIO</span>
         <div className="w-10" />
       </div>
 
@@ -212,12 +224,13 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
               >
                 <div
                   style={{
-                    fontFamily: font,
+                    fontFamily: STUDIO_FONT,
+                    fontWeight: 700,
                     color: color,
                     fontSize: `${fontSize}px`,
                     lineHeight: 1.15,
                   }}
-                  className="whitespace-pre-wrap text-center font-bold tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]"
+                  className="whitespace-pre-wrap text-center tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]"
                 >
                   {text}
                 </div>
@@ -248,6 +261,9 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
             <h2 className="font-anton text-3xl uppercase tracking-tight text-[#3C1A11] mt-0.5">
               {baseProduct.name}
             </h2>
+            <span className="inline-block mt-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#3C1A11]/10 text-[#3C1A11]">
+              Font: SF Pro Bold
+            </span>
           </div>
 
           <div className="space-y-1.5">
@@ -263,47 +279,49 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
                 setIsSelected(true);
               }}
               placeholder="E.G. SAGAR"
-              className="w-full p-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] font-anton text-lg tracking-wider text-[#3C1A11] outline-none resize-none"
+              style={{ fontFamily: STUDIO_FONT, fontWeight: 700 }}
+              className="w-full p-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-lg tracking-tight text-[#3C1A11] outline-none resize-none"
             />
             <span className="text-[10px] font-bold text-[#3C1A11]/50">{text.length}/25 characters</span>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black uppercase tracking-wider">Font Style</label>
-            <div className="grid grid-cols-2 gap-2">
-              {FONTS.map((f) => (
-                <button
-                  key={f.label}
-                  type="button"
-                  onClick={() => setFont(f.value)}
-                  style={{ fontFamily: f.value }}
-                  className={`h-10 rounded-xl border-2 text-xs font-bold cursor-pointer transition-all ${
-                    font === f.value
-                      ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
-                      : "border-[#3C1A11]/30 bg-white text-[#3C1A11]"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
+          <div className="space-y-2.5">
             <label className="block text-xs font-black uppercase tracking-wider">Text Color</label>
             <div className="flex flex-wrap gap-2.5">
               {COLORS.map((c) => (
                 <button
                   key={c.label}
                   type="button"
-                  onClick={() => setColor(c.value)}
+                  onClick={() => selectColor(c.value)}
                   title={c.label}
                   style={{ backgroundColor: c.value }}
                   className={`w-9 h-9 rounded-full border-2 cursor-pointer transition-transform ${
-                    color === c.value ? "border-[#D94F27] scale-110 ring-2 ring-[#D94F27]/40" : "border-[#3C1A11]/40"
+                    color.toUpperCase() === c.value.toUpperCase()
+                      ? "border-[#D94F27] scale-110 ring-2 ring-[#D94F27]/40"
+                      : "border-[#3C1A11]/40"
                   }`}
                 />
               ))}
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <label className="relative w-10 h-10 rounded-xl border-2 border-[#3C1A11] overflow-hidden cursor-pointer shrink-0">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => selectColor(e.target.value)}
+                  aria-label="Pick custom color"
+                  className="absolute -inset-2 w-14 h-14 cursor-pointer"
+                />
+              </label>
+              <input
+                type="text"
+                value={hexInput}
+                onChange={(e) => handleHexChange(e.target.value)}
+                placeholder="#FFFFFF"
+                maxLength={7}
+                className="flex-1 h-10 px-3 rounded-xl border-2 border-[#3C1A11]/30 focus:border-[#3C1A11] bg-[#FFF8F0] font-mono text-xs font-black uppercase outline-none"
+              />
             </div>
           </div>
 

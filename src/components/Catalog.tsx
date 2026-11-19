@@ -206,9 +206,13 @@ export function ProductCard({
   isWishlisted: boolean;
   onToggleWishlist: (productId: string) => void;
 }) {
-  const allImages = Array.isArray(product.images) && product.images.length > 0
-    ? product.images
-    : [product.image];
+  const extraImages = [
+    ...(Array.isArray(product.images) ? product.images : []),
+    ...(Array.isArray(product.imagesRegular) ? product.imagesRegular : []),
+    ...(Array.isArray(product.imagesOversized) ? product.imagesOversized : []),
+  ].filter((img) => img && img !== product.image);
+
+  const allImages = [product.image, ...Array.from(new Set(extraImages))];
   const [activeImgIdx, setActiveImgIdx] = useState(0);
   const [intervalId, setIntervalId] = useState<number | null>(null);
 
