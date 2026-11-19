@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { collection, doc, onSnapshot, updateDoc, query, orderBy, setDoc, addDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc, query, orderBy, setDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { signOut, onAuthStateChanged, type User } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { checkIsAdmin } from "../utils/adminCheck";
@@ -29,6 +29,8 @@ const ORDER_STATUSES = [
 ] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+export type PaymentVerificationStatus = "pending_verification" | "verified" | "rejected";
+
 export interface OrderItem {
   id?: string | number;
   name: string;
@@ -49,6 +51,11 @@ export interface AdminOrder {
   roomNumber: string;
   deliveryNote?: string;
   paymentMethod: "upi" | "cod";
+  paymentStatus: PaymentVerificationStatus;
+  payerUpiId?: string;
+  transactionRefId?: string;
+  paymentTime?: string;
+  paymentScreenshotBase64?: string;
   grandTotal: number;
   status: OrderStatus;
   items: OrderItem[];
@@ -67,6 +74,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [inventory, setInventory] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -90,36 +98,36 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
 
   const [buy4get1Enabled, setBuy4get1Enabled] = useState(false);
   const [offerSuccess, setOfferSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "inventory" | "reels">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "payments" | "inventory" | "reels">("orders");
   const [reelsList, setReelsList] = useState<any[]>([]);
   const [newReelUrl, setNewReelUrl] = useState("");
   const [newReelCaption, setNewReelCaption] = useState("");
   const [reelLoading, setReelLoading] = useState(false);
   const [showReelsOnHome, setShowReelsOnHome] = useState(false);
-const [reelsSettingSuccess, setReelsSettingSuccess] = useState(false);
-const [newProdStudioImg, setNewProdStudioImg] = useState("");
-const [previewDesign, setPreviewDesign] = useState<any | null>(null);
+  const [reelsSettingSuccess, setReelsSettingSuccess] = useState(false);
+  const [newProdStudioImg, setNewProdStudioImg] = useState("");
+  const [previewDesign, setPreviewDesign] = useState<any | null>(null);
 
-useEffect(() => {
-  if (!isOpen) return;
-  const unsubSetting = onSnapshot(doc(db, "settings", "reels"), (snap) => {
-    if (snap.exists()) {
-      setShowReelsOnHome(snap.data().showReels === true);
+  useEffect(() => {
+    if (!isOpen) return;
+    const unsubSetting = onSnapshot(doc(db, "settings", "reels"), (snap) => {
+      if (snap.exists()) {
+        setShowReelsOnHome(snap.data().showReels === true);
+      }
+    });
+    return () => unsubSetting();
+  }, [isOpen]);
+
+  const handleToggleReelsVisibility = async (enabled: boolean) => {
+    try {
+      setShowReelsOnHome(enabled);
+      await setDoc(doc(db, "settings", "reels"), { showReels: enabled }, { merge: true });
+      setReelsSettingSuccess(true);
+      setTimeout(() => setReelsSettingSuccess(false), 2000);
+    } catch (err) {
+      console.error(err);
     }
-  });
-  return () => unsubSetting();
-}, [isOpen]);
-
-const handleToggleReelsVisibility = async (enabled: boolean) => {
-  try {
-    setShowReelsOnHome(enabled);
-    await setDoc(doc(db, "settings", "reels"), { showReels: enabled }, { merge: true });
-    setReelsSettingSuccess(true);
-    setTimeout(() => setReelsSettingSuccess(false), 2000);
-  } catch (err) {
-    console.error(err);
-  }
-};
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -134,7 +142,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 
   useEffect(() => {
     const unsubReels = onSnapshot(collection(db, "reels"), (snap) => {
-      setReelsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setReelsList(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     if (!isOpen) return;
     const unsub = onSnapshot(doc(db, "settings", "offers"), (snap) => {
@@ -365,6 +373,11 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
             });
           }
 
+          const resolvedPaymentStatus: PaymentVerificationStatus =
+            data.paymentStatus === "verified" || data.paymentStatus === "rejected"
+              ? data.paymentStatus
+              : "pending_verification";
+
           return {
             id: data.orderId || docSnap.id,
             docId: docSnap.id,
@@ -375,6 +388,11 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
             roomNumber: data.roomNumber || "",
             deliveryNote: data.deliveryNote || "",
             paymentMethod: data.paymentMethod || "upi",
+            paymentStatus: resolvedPaymentStatus,
+            payerUpiId: data.payerUpiId || "",
+            transactionRefId: data.transactionRefId || "",
+            paymentTime: data.paymentTime || "",
+            paymentScreenshotBase64: data.paymentScreenshotBase64 || "",
             grandTotal: Number(data.grandTotal || 0),
             status: (data.status as OrderStatus) || "Received",
             items: Array.isArray(data.items) ? data.items : [],
@@ -471,10 +489,39 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     }
   };
 
-  const handleStatusChange = async (docId: string, newStatus: OrderStatus) => {
+  const handleVerifyPayment = async (
+    order: AdminOrder,
+    decision: "verified" | "rejected"
+  ) => {
     try {
-      setUpdatingId(docId);
-      const orderRef = doc(db, "orders", docId);
+      setVerifyingId(order.docId);
+      const orderRef = doc(db, "orders", order.docId);
+      await updateDoc(
+        orderRef,
+        decision === "verified"
+          ? {
+              paymentStatus: "verified",
+              verifiedAt: serverTimestamp(),
+              verifiedBy: currentUser?.email || currentUser?.uid || "admin",
+            }
+          : {
+              paymentStatus: "rejected",
+              rejectedAt: serverTimestamp(),
+              rejectedBy: currentUser?.email || currentUser?.uid || "admin",
+            }
+      );
+    } catch (err) {
+      console.error("Failed to update payment status:", err);
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const handleStatusChange = async (order: AdminOrder, newStatus: OrderStatus) => {
+    if (order.paymentStatus !== "verified") return;
+    try {
+      setUpdatingId(order.docId);
+      const orderRef = doc(db, "orders", order.docId);
       await updateDoc(orderRef, { status: newStatus });
     } catch (err) {
       console.error("Failed to update status:", err);
@@ -493,9 +540,15 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     }
   };
 
+  const pendingVerificationOrders = useMemo(() => {
+    return orders.filter((order) => order.paymentStatus === "pending_verification");
+  }, [orders]);
+
   const metrics = useMemo(() => {
     const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((acc, order) => acc + order.grandTotal, 0);
+    const totalRevenue = orders
+      .filter((order) => order.paymentStatus === "verified")
+      .reduce((acc, order) => acc + order.grandTotal, 0);
     const customItemsCount = orders.reduce((acc, order) => {
       const customsInOrder = order.items.reduce((itemAcc, item) => {
         return itemAcc + (item.customText && item.customText.trim() !== "" ? item.quantity : 0);
@@ -519,6 +572,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       return matchesCampus && matchesStatus && matchesSearch;
     });
   }, [orders, selectedCampus, selectedStatusFilter, searchQuery]);
+
   if (!isOpen) return null;
 
   const isAuthorized = Boolean(currentUser && isAdminUser);
@@ -582,7 +636,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
               Live
             </span>
           </div>
-          <div className="bg-[#3C1A11] px-6 py-2 flex gap-4 border-b border-[#FFE2C7]/10">
+          <div className="bg-[#3C1A11] px-6 py-2 flex flex-wrap gap-4 border-b border-[#FFE2C7]/10">
             <button
               type="button"
               onClick={() => setActiveTab("orders")}
@@ -591,6 +645,18 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
               }`}
             >
               Orders & Dispatch
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("payments")}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "payments" ? "border-[#BDF119] text-[#BDF119]" : "border-transparent text-[#FFE2C7]/60"
+              }`}
+            >
+              <span>Payment Verification</span>
+              <span className="bg-[#D94F27] text-[#FFE2C7] text-[10px] px-1.5 py-0.2 rounded-full">
+                {pendingVerificationOrders.length}
+              </span>
             </button>
             <button
               type="button"
@@ -646,7 +712,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
 
           <div className="bg-white border-2 border-[#3C1A11] rounded-2xl p-6 shadow-md relative overflow-hidden flex flex-col justify-between">
             <div className="flex justify-between items-start">
-              <span className="text-[11px] font-black uppercase tracking-wider text-[#3C1A11]/60">Cumulative Revenue</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#3C1A11]/60">Verified Revenue</span>
               <div className="w-8 h-8 rounded-lg bg-[#BDF119]/30 text-[#3C1A11] flex items-center justify-center font-anton text-base">
                 ₹
               </div>
@@ -655,7 +721,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
               <span className="font-anton text-5xl text-[#D94F27] tracking-tight">
                 ₹{metrics.totalRevenue.toLocaleString("en-IN")}
               </span>
-              <p className="text-[11px] font-bold text-[#3C1A11]/60 mt-1 uppercase tracking-wide">Gross Total</p>
+              <p className="text-[11px] font-bold text-[#3C1A11]/60 mt-1 uppercase tracking-wide">Approved UPI Total</p>
             </div>
           </div>
 
@@ -675,6 +741,108 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
           </div>
         </section>
 
+        {activeTab === "payments" && (
+          <section className="bg-white border-2 border-[#3C1A11] rounded-2xl p-6 shadow-lg space-y-6">
+            <div>
+              <span className="text-[10px] font-black uppercase text-[#D94F27] tracking-widest">Manual UPI Audit Queue</span>
+              <h2 className="font-anton text-3xl uppercase tracking-tight mt-0.5">
+                PENDING PAYMENT VERIFICATIONS ({pendingVerificationOrders.length})
+              </h2>
+              <p className="text-xs font-bold text-[#3C1A11]/60 mt-1">
+                Verify the payer UPI ID, UTR/Ref ID, timestamp, and screenshot against your UPI app before approving.
+              </p>
+            </div>
+
+            {pendingVerificationOrders.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-[#3C1A11]/20 bg-[#FFF8F0] p-10 text-center text-xs font-bold text-[#3C1A11]/60">
+                No orders currently waiting for payment verification.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {pendingVerificationOrders.map((order) => (
+                  <div
+                    key={order.docId}
+                    className="border-2 border-[#3C1A11] rounded-2xl p-5 bg-[#FFF8F0] space-y-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3 border-b border-[#3C1A11]/15 pb-3">
+                      <div>
+                        <span className="font-anton text-xl text-[#3C1A11] block">{order.id}</span>
+                        <span className="text-xs font-bold text-[#3C1A11]/80 block">{order.fullName}</span>
+                        <span className="text-[10px] font-mono text-[#3C1A11]/60">{order.createdAt}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-black uppercase text-[#D94F27] block">EXACT AMOUNT OWED</span>
+                        <span className="font-anton text-2xl text-[#D94F27]">
+                          ₹{order.grandTotal.toLocaleString("en-IN")}.00
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-white p-3.5 rounded-xl border border-[#3C1A11]/15">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/50 block">Payer UPI ID</span>
+                        <span className="font-mono font-bold text-[#3C1A11] break-all">
+                          {order.payerUpiId || "Not submitted yet"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/50 block">Transaction / Ref ID</span>
+                        <span className="font-mono font-bold text-[#3C1A11] break-all">
+                          {order.transactionRefId || "Not submitted yet"}
+                        </span>
+                      </div>
+                      <div className="sm:col-span-2 pt-1 border-t border-[#3C1A11]/10">
+                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/50 block">Payment Time</span>
+                        <span className="font-mono font-bold text-[#3C1A11]">
+                          {order.paymentTime || "Not submitted yet"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-[#3C1A11]/60 block mb-1.5">
+                        Submitted Screenshot
+                      </span>
+                      {order.paymentScreenshotBase64 ? (
+                        <div className="rounded-xl overflow-hidden border-2 border-[#3C1A11] bg-white max-h-72 flex items-center justify-center">
+                          <img
+                            src={order.paymentScreenshotBase64}
+                            alt={`Payment proof for ${order.id}`}
+                            className="max-h-72 w-auto object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-xl border border-dashed border-[#3C1A11]/30 bg-white text-xs font-bold text-[#3C1A11]/50 text-center">
+                          No screenshot uploaded yet
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        type="button"
+                        disabled={verifyingId === order.docId}
+                        onClick={() => handleVerifyPayment(order, "verified")}
+                        className="flex-1 h-10 rounded-xl bg-[#3C1A11] hover:bg-[#22543D] text-[#BDF119] font-black text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {verifyingId === order.docId ? "Updating..." : "Verify & Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={verifyingId === order.docId}
+                        onClick={() => handleVerifyPayment(order, "rejected")}
+                        className="flex-1 h-10 rounded-xl bg-[#D94F27] hover:bg-[#F47E20] text-[#FFE2C7] font-black text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {activeTab === "reels" && (
           <section className="bg-white border-2 border-[#3C1A11] rounded-2xl p-6 shadow-lg space-y-6">
             <div>
@@ -686,34 +854,34 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
             </div>
 
             <div className="bg-[#FFF8F0] border-2 border-[#3C1A11] p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-  <div>
-    <h3 className="font-anton text-lg uppercase text-[#3C1A11]">Homepage Reels Section Visibility</h3>
-    <p className="text-xs font-semibold text-[#3C1A11]/70 mt-0.5">
-      Toggle whether the Campus Influencer Reels row is visible on the homepage.
-    </p>
-    {reelsSettingSuccess && <span className="text-[10px] font-black text-[#2952CC] uppercase">Setting updated live!</span>}
-  </div>
-  <div className="flex gap-2">
-    <button
-      type="button"
-      onClick={() => handleToggleReelsVisibility(true)}
-      className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
-        showReelsOnHome ? "bg-[#3C1A11] text-[#BDF119]" : "bg-[#3C1A11]/10 text-[#3C1A11]"
-      }`}
-    >
-      Show
-    </button>
-    <button
-      type="button"
-      onClick={() => handleToggleReelsVisibility(false)}
-      className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
-        !showReelsOnHome ? "bg-[#D94F27] text-white" : "bg-[#3C1A11]/10 text-[#3C1A11]"
-      }`}
-    >
-      Hide
-    </button>
-  </div>
-</div>
+              <div>
+                <h3 className="font-anton text-lg uppercase text-[#3C1A11]">Homepage Reels Section Visibility</h3>
+                <p className="text-xs font-semibold text-[#3C1A11]/70 mt-0.5">
+                  Toggle whether the Campus Influencer Reels row is visible on the homepage.
+                </p>
+                {reelsSettingSuccess && <span className="text-[10px] font-black text-[#2952CC] uppercase">Setting updated live!</span>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleToggleReelsVisibility(true)}
+                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+                    showReelsOnHome ? "bg-[#3C1A11] text-[#BDF119]" : "bg-[#3C1A11]/10 text-[#3C1A11]"
+                  }`}
+                >
+                  Show
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleReelsVisibility(false)}
+                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+                    !showReelsOnHome ? "bg-[#D94F27] text-white" : "bg-[#3C1A11]/10 text-[#3C1A11]"
+                  }`}
+                >
+                  Hide
+                </button>
+              </div>
+            </div>
 
             <form onSubmit={handleAddReel} className="bg-[#FFF8F0] border-2 border-[#3C1A11] p-5 rounded-2xl space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -851,113 +1019,142 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                       </td>
                     </tr>
                   ) : (
-                    filteredOrders.map((order) => (
-                      <tr key={order.docId} className="hover:bg-[#FFF8F0]/70 transition-colors">
-                        <td className="py-3 px-4 align-top">
-                          <span className="font-anton text-sm tracking-wide text-[#3C1A11] block">{order.id}</span>
-                          <span className="text-[10px] font-mono font-bold text-[#3C1A11]/60 block mt-0.5">
-                            {order.createdAt}
-                          </span>
-                        </td>
+                    filteredOrders.map((order) => {
+                      const isPaymentVerified = order.paymentStatus === "verified";
 
-                        <td className="py-3 px-4 align-top">
-                          <span className="font-bold text-xs uppercase text-[#3C1A11] block">{order.fullName}</span>
-                          {order.mobile ? (
-                            <a
-                              href={`tel:${order.mobile}`}
-                              className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-[#2952CC] hover:underline mt-0.5"
-                            >
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
-                              </svg>
-                              {order.mobile}
-                            </a>
-                          ) : (
-                            <span className="text-[10px] text-[#3C1A11]/50 font-bold block">No phone</span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-4 align-top">
-                          <span className="font-black text-[11px] uppercase text-[#D94F27] block">{order.campus}</span>
-                          <span className="font-bold text-xs block text-[#3C1A11] mt-0.5">
-                            {order.hostelName} - Room {order.roomNumber}
-                          </span>
-                          {order.deliveryNote && (
-                            <span className="text-[10px] font-medium text-[#3C1A11]/60 italic block mt-1 bg-[#3C1A11]/5 p-1 rounded">
-                              "{order.deliveryNote}"
+                      return (
+                        <tr key={order.docId} className="hover:bg-[#FFF8F0]/70 transition-colors">
+                          <td className="py-3 px-4 align-top">
+                            <span className="font-anton text-sm tracking-wide text-[#3C1A11] block">{order.id}</span>
+                            <span className="text-[10px] font-mono font-bold text-[#3C1A11]/60 block mt-0.5">
+                              {order.createdAt}
                             </span>
-                          )}
-                        </td>
+                          </td>
 
-                        <td className="py-3 px-4 align-top space-y-1.5">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="border-b border-[#3C1A11]/5 pb-1 last:border-0 last:pb-0">
-                              <div className="flex items-center gap-1 font-bold text-xs">
-                                <span className="bg-[#3C1A11] text-[#FFE2C7] px-1.5 py-0.2 rounded text-[10px]">
-                                  {item.quantity}x
-                                </span>
-                                <span className="text-[#3C1A11]">{item.name}</span>
-                                <span className="text-[10px] text-[#3C1A11]/60">[{item.size}]</span>
-                              </div>
+                          <td className="py-3 px-4 align-top">
+                            <span className="font-bold text-xs uppercase text-[#3C1A11] block">{order.fullName}</span>
+                            {order.mobile ? (
+                              <a
+                                href={`tel:${order.mobile}`}
+                                className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-[#2952CC] hover:underline mt-0.5"
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
+                                </svg>
+                                {order.mobile}
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-[#3C1A11]/50 font-bold block">No phone</span>
+                            )}
+                          </td>
 
-                              {item.customText && item.customText.trim() !== "" && (
-                                <div className="mt-1 bg-[#D94F27]/10 border border-[#D94F27] px-2 py-0.5 rounded text-[11px] font-black text-[#D94F27] uppercase tracking-wider inline-block">
-                                  STUDIO PRINT: "{item.customText}"
-                                  {(item as any).studioDesign && (
-  <button
-    type="button"
-    onClick={() => setPreviewDesign((item as any).studioDesign)}
-    className="mt-1 ml-2 px-2 py-0.5 rounded bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
-  >
-    View Design
-  </button>
-)}
+                          <td className="py-3 px-4 align-top">
+                            <span className="font-black text-[11px] uppercase text-[#D94F27] block">{order.campus}</span>
+                            <span className="font-bold text-xs block text-[#3C1A11] mt-0.5">
+                              {order.hostelName} - Room {order.roomNumber}
+                            </span>
+                            {order.deliveryNote && (
+                              <span className="text-[10px] font-medium text-[#3C1A11]/60 italic block mt-1 bg-[#3C1A11]/5 p-1 rounded">
+                                "{order.deliveryNote}"
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 align-top space-y-1.5">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="border-b border-[#3C1A11]/5 pb-1 last:border-0 last:pb-0">
+                                <div className="flex items-center gap-1 font-bold text-xs">
+                                  <span className="bg-[#3C1A11] text-[#FFE2C7] px-1.5 py-0.2 rounded text-[10px]">
+                                    {item.quantity}x
+                                  </span>
+                                  <span className="text-[#3C1A11]">{item.name}</span>
+                                  <span className="text-[10px] text-[#3C1A11]/60">[{item.size}]</span>
                                 </div>
+
+                                {item.customText && item.customText.trim() !== "" && (
+                                  <div className="mt-1 bg-[#D94F27]/10 border border-[#D94F27] px-2 py-0.5 rounded text-[11px] font-black text-[#D94F27] uppercase tracking-wider inline-block">
+                                    STUDIO PRINT: "{item.customText}"
+                                    {(item as any).studioDesign && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewDesign((item as any).studioDesign)}
+                                        className="mt-1 ml-2 px-2 py-0.5 rounded bg-[#3C1A11] text-[#BDF119] text-[10px] font-black uppercase cursor-pointer"
+                                      >
+                                        View Design
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </td>
+
+                          <td className="py-3 px-4 align-top space-y-1">
+                            {order.paymentStatus === "verified" ? (
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[#BDF119]/40 text-[#3C1A11] border border-[#3C1A11]/20">
+                                UPI VERIFIED
+                              </span>
+                            ) : order.paymentStatus === "rejected" ? (
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[#D94F27]/15 text-[#D94F27] border border-[#D94F27]/30">
+                                PAYMENT REJECTED
+                              </span>
+                            ) : (
+                              <div className="space-y-1">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[#FACC15]/30 text-[#3C1A11] border border-[#3C1A11]/25">
+                                  PENDING VERIFICATION
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab("payments")}
+                                  className="block text-[10px] font-black uppercase text-[#2952CC] hover:underline cursor-pointer"
+                                >
+                                  Review Proof →
+                                </button>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 align-top font-anton text-sm text-[#3C1A11]">
+                            ₹{order.grandTotal.toLocaleString("en-IN")}.00
+                          </td>
+
+                          <td className="py-3 px-4 align-top">
+                            <div className="relative">
+                              <select
+                                disabled={!isPaymentVerified || updatingId === order.docId}
+                                value={order.status}
+                                onChange={(e) => handleStatusChange(order, e.target.value as OrderStatus)}
+                                title={
+                                  !isPaymentVerified
+                                    ? "Verify payment first before updating fulfillment status"
+                                    : "Update fulfillment status"
+                                }
+                                className={`w-full h-8 px-2 rounded-lg font-black text-[11px] uppercase tracking-wider border-2 outline-none transition-all ${
+                                  !isPaymentVerified
+                                    ? "bg-[#3C1A11]/5 border-[#3C1A11]/20 text-[#3C1A11]/40 cursor-not-allowed"
+                                    : order.status === "Delivered"
+                                    ? "bg-[#BDF119]/30 border-[#BDF119] text-[#3C1A11] cursor-pointer"
+                                    : order.status === "In Transit"
+                                    ? "bg-[#2952CC]/15 border-[#2952CC] text-[#2952CC] cursor-pointer"
+                                    : "bg-[#3C1A11]/10 border-[#3C1A11] text-[#3C1A11] cursor-pointer"
+                                }`}
+                              >
+                                {ORDER_STATUSES.map((statusOption) => (
+                                  <option key={statusOption} value={statusOption} className="bg-[#FFF8F0] text-[#3C1A11]">
+                                    {statusOption}
+                                  </option>
+                                ))}
+                              </select>
+                              {!isPaymentVerified && (
+                                <span className="block text-[9px] font-bold text-[#D94F27] mt-1">
+                                  Awaiting payment verification
+                                </span>
                               )}
                             </div>
-                          ))}
-                        </td>
-
-                        <td className="py-3 px-4 align-top">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                              order.paymentMethod === "upi"
-                                ? "bg-[#2952CC]/15 text-[#2952CC] border border-[#2952CC]/30"
-                                : "bg-[#D94F27]/15 text-[#D94F27] border border-[#D94F27]/30"
-                            }`}
-                          >
-                            {order.paymentMethod === "upi" ? "UPI / PAID" : "CASH ON DEL"}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 align-top font-anton text-sm text-[#3C1A11]">
-                          ₹{order.grandTotal.toLocaleString("en-IN")}.00
-                        </td>
-
-                        <td className="py-3 px-4 align-top">
-                          <div className="relative">
-                            <select
-                              disabled={updatingId === order.docId}
-                              value={order.status}
-                              onChange={(e) => handleStatusChange(order.docId, e.target.value as OrderStatus)}
-                              className={`w-full h-8 px-2 rounded-lg font-black text-[11px] uppercase tracking-wider border-2 outline-none cursor-pointer transition-all ${
-                                order.status === "Delivered"
-                                ? "bg-[#BDF119]/30 border-[#BDF119] text-[#3C1A11]"
-                                : order.status === "In Transit"
-                                ? "bg-[#2952CC]/15 border-[#2952CC] text-[#2952CC]"
-                                : "bg-[#3C1A11]/10 border-[#3C1A11] text-[#3C1A11]"
-                              }`}
-                            >
-                              {ORDER_STATUSES.map((statusOption) => (
-                                <option key={statusOption} value={statusOption} className="bg-[#FFF8F0] text-[#3C1A11]">
-                                  {statusOption}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1013,31 +1210,31 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 {createSuccess && <span className="text-xs font-black text-[#BDF119] bg-[#3C1A11] px-2 py-1 rounded uppercase">Product Added Live!</span>}
               </div>
               <div className="space-y-1.5 pt-2">
-  <label className="block text-[10px] font-black uppercase">
-    Unora Studio Image (Google Drive URL — Single Blank/Back Image)
-  </label>
-  <input
-    type="text"
-    value={newProdStudioImg}
-    onChange={(e) => setNewProdStudioImg(e.target.value)}
-    placeholder="Paste Google Drive link for Studio customizer"
-    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-[#FFF8F0] text-xs font-bold outline-none"
-  />
-</div>
+                <label className="block text-[10px] font-black uppercase">
+                  Unora Studio Image (Google Drive URL — Single Blank/Back Image)
+                </label>
+                <input
+                  type="text"
+                  value={newProdStudioImg}
+                  onChange={(e) => setNewProdStudioImg(e.target.value)}
+                  placeholder="Paste Google Drive link for Studio customizer"
+                  className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-[#FFF8F0] text-xs font-bold outline-none"
+                />
+              </div>
 
               <div>
-  <label className="block text-[10px] font-black uppercase mb-1">Garment Type</label>
-  <select
-    value={newProdType}
-    onChange={(e) => setNewProdType(e.target.value as any)}
-    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] text-xs font-bold outline-none cursor-pointer"
-  >
-    <option value="t-shirt">T-Shirt</option>
-    <option value="hoodie">Hoodie</option>
-    <option value="sweatshirt">Sweatshirt</option>
-    <option value="jacket">Jacket</option>
-  </select>
-</div>
+                <label className="block text-[10px] font-black uppercase mb-1">Garment Type</label>
+                <select
+                  value={newProdType}
+                  onChange={(e) => setNewProdType(e.target.value as any)}
+                  className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] text-xs font-bold outline-none cursor-pointer"
+                >
+                  <option value="t-shirt">T-Shirt</option>
+                  <option value="hoodie">Hoodie</option>
+                  <option value="sweatshirt">Sweatshirt</option>
+                  <option value="jacket">Jacket</option>
+                </select>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase mb-1">Product Name</label>
@@ -1070,7 +1267,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                     onChange={(e) => setNewProdCampus(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] text-xs font-bold outline-none cursor-pointer"
                   >
-                    {CAMPUSES.filter(c => c !== "ALL").map(c => (
+                    {CAMPUSES.filter((c) => c !== "ALL").map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
@@ -1104,31 +1301,32 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
               </div>
 
               <div className="space-y-1.5 pt-2">
-  <label className="block text-[10px] font-black uppercase">Available Sizes</label>
-  <div className="flex flex-wrap gap-2">
-    {ALL_SIZES.map((sz) => {
-      const active = newProdSizes.includes(sz);
-      return (
-        <button
-          key={sz}
-          type="button"
-          onClick={() =>
-            setNewProdSizes((prev) =>
-              prev.includes(sz) ? prev.filter((s) => s !== sz) : [...prev, sz]
-            )
-          }
-          className={`px-3 py-1.5 rounded-lg border-2 text-xs font-black uppercase cursor-pointer transition-all ${
-            active
-              ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
-              : "bg-white border-[#3C1A11]/20 text-[#3C1A11]/40"
-          }`}
-        >
-          {sz}
-        </button>
-      );
-    })}
-  </div>
-</div>
+                <label className="block text-[10px] font-black uppercase">Available Sizes</label>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_SIZES.map((sz) => {
+                    const active = newProdSizes.includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() =>
+                          setNewProdSizes((prev) =>
+                            prev.includes(sz) ? prev.filter((s) => s !== sz) : [...prev, sz]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-lg border-2 text-xs font-black uppercase cursor-pointer transition-all ${
+                          active
+                            ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+                            : "bg-white border-[#3C1A11]/20 text-[#3C1A11]/40"
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {(newProdFitType === "both" || newProdFitType === "regular") && (
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
@@ -1320,30 +1518,30 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   <button type="button" onClick={() => setEditingItem(null)} className="text-xs font-bold text-[#3C1A11]/60 hover:text-[#3C1A11]">Cancel</button>
                 </div>
                 <div className="space-y-1.5 pt-2">
-  <label className="block text-[10px] font-black uppercase">
-    Unora Studio Image (Google Drive URL — Single Blank/Back Image)
-  </label>
-  <input
-  type="text"
-  value={editingItem.studioImage || ""}
-  onChange={(e) => setEditingItem({ ...editingItem, studioImage: e.target.value })}
-  placeholder="Paste Google Drive link for Studio customizer"
-  className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
-/>
-</div>
+                  <label className="block text-[10px] font-black uppercase">
+                    Unora Studio Image (Google Drive URL — Single Blank/Back Image)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingItem.studioImage || ""}
+                    onChange={(e) => setEditingItem({ ...editingItem, studioImage: e.target.value })}
+                    placeholder="Paste Google Drive link for Studio customizer"
+                    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
+                  />
+                </div>
                 <div>
-  <label className="block text-[10px] font-black uppercase mb-1">Garment Type</label>
-  <select
-    value={editingItem.productType || "t-shirt"}
-    onChange={(e) => setEditingItem({ ...editingItem, productType: e.target.value })}
-    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
-  >
-    <option value="t-shirt">T-Shirt</option>
-    <option value="hoodie">Hoodie</option>
-    <option value="sweatshirt">Sweatshirt</option>
-    <option value="jacket">Jacket</option>
-  </select>
-</div>
+                  <label className="block text-[10px] font-black uppercase mb-1">Garment Type</label>
+                  <select
+                    value={editingItem.productType || "t-shirt"}
+                    onChange={(e) => setEditingItem({ ...editingItem, productType: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+                  >
+                    <option value="t-shirt">T-Shirt</option>
+                    <option value="hoodie">Hoodie</option>
+                    <option value="sweatshirt">Sweatshirt</option>
+                    <option value="jacket">Jacket</option>
+                  </select>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
@@ -1382,7 +1580,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                       onChange={(e) => setEditingItem({ ...editingItem, campus: e.target.value })}
                       className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
                     >
-                      {CAMPUSES.filter(c => c !== "ALL").map(c => (
+                      {CAMPUSES.filter((c) => c !== "ALL").map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
@@ -1445,35 +1643,36 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 </div>
 
                 <div className="space-y-1.5 pt-1">
-  <label className="block text-[10px] font-black uppercase">Available Sizes</label>
-  <div className="flex flex-wrap gap-2">
-    {ALL_SIZES.map((sz) => {
-      const currentSizes: string[] = Array.isArray(editingItem.availableSizes)
-        ? editingItem.availableSizes
-        : ALL_SIZES;
-      const active = currentSizes.includes(sz);
-      return (
-        <button
-          key={sz}
-          type="button"
-          onClick={() => {
-            const nextSizes = active
-              ? currentSizes.filter((s) => s !== sz)
-              : [...currentSizes, sz];
-            setEditingItem({ ...editingItem, availableSizes: nextSizes });
-          }}
-          className={`px-3 py-1.5 rounded-lg border-2 text-xs font-black uppercase cursor-pointer transition-all ${
-            active
-              ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
-              : "bg-white border-[#3C1A11]/20 text-[#3C1A11]/40"
-          }`}
-        >
-          {sz}
-        </button>
-      );
-    })}
-  </div>
-</div>
+                  <label className="block text-[10px] font-black uppercase">Available Sizes</label>
+                  <div className="flex flex-wrap gap-2">
+                    {ALL_SIZES.map((sz) => {
+                      const currentSizes: string[] = Array.isArray(editingItem.availableSizes)
+                        ? editingItem.availableSizes
+                        : ALL_SIZES;
+                      const active = currentSizes.includes(sz);
+                      return (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => {
+                            const nextSizes = active
+                              ? currentSizes.filter((s) => s !== sz)
+                              : [...currentSizes, sz];
+                            setEditingItem({ ...editingItem, availableSizes: nextSizes });
+                          }}
+                          className={`px-3 py-1.5 rounded-lg border-2 text-xs font-black uppercase cursor-pointer transition-all ${
+                            active
+                              ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+                              : "bg-white border-[#3C1A11]/20 text-[#3C1A11]/40"
+                          }`}
+                        >
+                          {sz}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {((editingItem.fitType || (editingItem.hasOversized === false ? "regular" : "both")) !== "oversized") && (
                   <div className="space-y-2 pt-2">
                     <div className="flex items-center justify-between">
@@ -1639,81 +1838,81 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 </thead>
                 <tbody className="divide-y divide-[#3C1A11]/10">
                   {inventory.map((item) => (
-  <tr
-    key={item.id}
-    className={`hover:bg-[#FFF8F0]/70 ${item.isHidden ? "opacity-50" : ""}`}
-  >
-    <td className="py-3 px-4 flex items-center gap-2">
-      <img src={item.image} alt={item.name} className="w-8 h-10 object-cover rounded" />
-      <span className="font-bold text-xs">{item.name}</span>
-    </td>
-    <td className="py-3 px-4 font-bold">{item.campus}</td>
-    <td className="py-3 px-4">
-      <span className="font-anton text-sm">₹{item.price}</span>
-      <s className="text-[#3C1A11]/40 ml-1.5">₹{item.originalPrice}</s>
-    </td>
-    <td className="py-3 px-4">
-      <span className="bg-[#3C1A11]/10 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
-        {item.badge}
-      </span>
-    </td>
-    <td className="py-3 px-4 space-x-1">
-      <span
-        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-          item.inStock !== false
-            ? "bg-[#BDF119]/30 text-[#3C1A11]"
-            : "bg-[#D94F27]/20 text-[#D94F27]"
-        }`}
-      >
-        {item.inStock !== false ? "In Stock" : "Sold Out"}
-      </span>
-      {item.isHidden && (
-        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#3C1A11] text-[#FFE2C7]">
-          Hidden
-        </span>
-      )}
-    </td>
-    <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
-      <button
-        type="button"
-        onClick={() => handleToggleVisibility(item)}
-        className={`px-2.5 py-1 rounded font-bold text-[10px] uppercase cursor-pointer transition-all ${
-          item.isHidden
-            ? "bg-[#2952CC] text-white hover:bg-[#3C1A11]"
-            : "bg-[#3C1A11]/15 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
-        }`}
-      >
-        {item.isHidden ? "Show" : "Hide"}
-      </button>
-      <button
-        type="button"
-        onClick={() =>
-          setEditingItem({
-            ...item,
-            imagesRegular:
-              Array.isArray(item.imagesRegular) && item.imagesRegular.length > 0
-                ? [...item.imagesRegular]
-                : [item.image || ""],
-            imagesOversized:
-              Array.isArray(item.imagesOversized) && item.imagesOversized.length > 0
-                ? [...item.imagesOversized]
-                : [item.image || ""],
-          })
-        }
-        className="px-2.5 py-1 bg-[#3C1A11] hover:bg-[#D94F27] text-[#BDF119] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer"
-      >
-        Edit
-      </button>
-      <button
-        type="button"
-        onClick={() => handleDeleteProduct(item.id, item.name)}
-        className="px-2.5 py-1 bg-[#D94F27]/15 text-[#D94F27] hover:bg-[#D94F27] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer transition-all"
-      >
-        Delete
-      </button>
-    </td>
-  </tr>
-))}
+                    <tr
+                      key={item.id}
+                      className={`hover:bg-[#FFF8F0]/70 ${item.isHidden ? "opacity-50" : ""}`}
+                    >
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <img src={item.image} alt={item.name} className="w-8 h-10 object-cover rounded" />
+                        <span className="font-bold text-xs">{item.name}</span>
+                      </td>
+                      <td className="py-3 px-4 font-bold">{item.campus}</td>
+                      <td className="py-3 px-4">
+                        <span className="font-anton text-sm">₹{item.price}</span>
+                        <s className="text-[#3C1A11]/40 ml-1.5">₹{item.originalPrice}</s>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="bg-[#3C1A11]/10 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                          {item.badge}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 space-x-1">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            item.inStock !== false
+                              ? "bg-[#BDF119]/30 text-[#3C1A11]"
+                              : "bg-[#D94F27]/20 text-[#D94F27]"
+                          }`}
+                        >
+                          {item.inStock !== false ? "In Stock" : "Sold Out"}
+                        </span>
+                        {item.isHidden && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#3C1A11] text-[#FFE2C7]">
+                            Hidden
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleVisibility(item)}
+                          className={`px-2.5 py-1 rounded font-bold text-[10px] uppercase cursor-pointer transition-all ${
+                            item.isHidden
+                              ? "bg-[#2952CC] text-white hover:bg-[#3C1A11]"
+                              : "bg-[#3C1A11]/15 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+                          }`}
+                        >
+                          {item.isHidden ? "Show" : "Hide"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditingItem({
+                              ...item,
+                              imagesRegular:
+                                Array.isArray(item.imagesRegular) && item.imagesRegular.length > 0
+                                  ? [...item.imagesRegular]
+                                  : [item.image || ""],
+                              imagesOversized:
+                                Array.isArray(item.imagesOversized) && item.imagesOversized.length > 0
+                                  ? [...item.imagesOversized]
+                                  : [item.image || ""],
+                            })
+                          }
+                          className="px-2.5 py-1 bg-[#3C1A11] hover:bg-[#D94F27] text-[#BDF119] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProduct(item.id, item.name)}
+                          className="px-2.5 py-1 bg-[#D94F27]/15 text-[#D94F27] hover:bg-[#D94F27] hover:text-white rounded font-bold text-[10px] uppercase cursor-pointer transition-all"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

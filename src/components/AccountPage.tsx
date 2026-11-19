@@ -9,6 +9,7 @@ export interface OrderRecord {
   total: number;
   itemsCount: number;
   status: "Received" | "In Transit" | "Delivered";
+  paymentStatus?: "pending_verification" | "verified" | "rejected";
 }
 
 interface AccountPageProps {
@@ -140,6 +141,17 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  <div>
+                      <span className="text-[10px] uppercase text-[#3C1A11]/50 block">PAYMENT</span>
+                      <span>
+                        {order.paymentStatus === "verified"
+                          ? "VERIFIED"
+                          : order.paymentStatus === "rejected"
+                          ? "REJECTED"
+                          : "PENDING VERIFICATION"}
+                      </span>
+                    </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-bold text-[#3C1A11]/80 pt-1">
                     <div>

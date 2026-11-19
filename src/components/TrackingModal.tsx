@@ -28,6 +28,7 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
     hostelName: string;
     roomNumber: string;
     status: UnifiedStatus;
+    paymentStatus: "pending_verification" | "verified" | "rejected";
     items: Array<{ name: string; size: string; customText?: string }>;
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -72,6 +73,10 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
               hostelName: data.hostelName || "Hostel",
               roomNumber: data.roomNumber || "",
               status: (data.status as UnifiedStatus) || "Received",
+              paymentStatus:
+                data.paymentStatus === "verified" || data.paymentStatus === "rejected"
+                  ? data.paymentStatus
+                  : "pending_verification",
               items: Array.isArray(data.items) ? data.items : [],
             });
             setNotFound(false);
@@ -144,17 +149,27 @@ export const TrackingModal: React.FC<TrackingModalProps> = ({
           </p>
         </div>
 
-        <div className="bg-[#D94F27]/10 border border-[#D94F27] rounded-2xl p-4 mb-6">
+        <div className="bg-[#D94F27]/10 border border-[#D94F27] rounded-2xl p-4 mb-6 space-y-1.5">
           <span className="text-[10px] font-black uppercase tracking-wider text-[#D94F27] block">
             LIVE DISPATCH STATUS
           </span>
-          <p className="font-bold text-xs text-[#3C1A11] mt-1">
+          <p className="font-bold text-xs text-[#3C1A11]">
             {notFound
               ? "Order not found. Please verify your reference code or contact support."
               : orderData
               ? getStatusMessage(orderData.status, orderData.campus, orderData.hostelName)
               : "Connecting to campus logistics node..."}
           </p>
+          {orderData && orderData.paymentStatus === "pending_verification" && (
+            <p className="text-[11px] font-bold text-[#3C1A11]/80">
+              Payment Status: Pending Verification — our team is checking your UPI proof before dispatch progression.
+            </p>
+          )}
+          {orderData && orderData.paymentStatus === "rejected" && (
+            <p className="text-[11px] font-bold text-[#D94F27]">
+              Payment Status: Rejected — your submitted UPI proof could not be verified. Please contact Unora support with your UTR/screenshot.
+            </p>
+          )}
         </div>
 
         <div className="space-y-4 my-6">
