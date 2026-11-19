@@ -51,10 +51,9 @@ export const Checkout: React.FC<CheckoutProps> = ({
     0
   );
 
-  const totalCustomFee = items.reduce(
-    (acc, item) => acc + (item.customFee || 0),
-    0
-  );
+  const totalCustomFee = items.reduce((acc, item) => {
+    return acc + (item.customFee || 0) * item.quantity;
+  }, 0);
 
   const deliveryFee = items.length > 0 ? 40 : 0;
   const grandTotal = Math.max(0, itemsTotal - appliedDiscount) + deliveryFee + totalCustomFee;

@@ -27,7 +27,7 @@ export interface UnoraStudioProps {
   }) => void;
 }
 
-const STUDIO_FONT = "'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif";
+const STUDIO_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif";
 
 const COLORS = [
   { label: "White", value: "#FFFFFF" },
@@ -36,8 +36,6 @@ const COLORS = [
   { label: "Cream", value: "#FFE2C7" },
   { label: "Burnt Orange", value: "#D94F27" },
   { label: "Neon Lime", value: "#BDF119" },
-  { label: "Campus Blue", value: "#2952CC" },
-  { label: "Gold", value: "#FACC15" },
 ];
 
 const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
@@ -80,17 +78,16 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
   if (!isOpen || !baseProduct) return null;
 
   const studioImg = baseProduct.studioImage || baseProduct.image;
-  const customFee = 299;
+  const customFee = 29;
 
-  const selectColor = (hex: string) => {
+  const handleSelectColor = (hex: string) => {
     const upper = hex.toUpperCase();
     setColor(upper);
     setHexInput(upper);
   };
 
   const handleHexChange = (val: string) => {
-    const clean = val.startsWith("#") ? val : `#${val}`;
-    const formatted = clean.toUpperCase().slice(0, 7);
+    const formatted = val.startsWith("#") ? val.toUpperCase() : `#${val.toUpperCase()}`;
     setHexInput(formatted);
     if (/^#([0-9A-F]{3}|[0-9A-F]{6})$/.test(formatted)) {
       setColor(formatted);
@@ -230,7 +227,7 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
                     fontSize: `${fontSize}px`,
                     lineHeight: 1.15,
                   }}
-                  className="whitespace-pre-wrap text-center tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]"
+                  className="whitespace-pre-wrap text-center tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]"
                 >
                   {text}
                 </div>
@@ -261,9 +258,9 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
             <h2 className="font-anton text-3xl uppercase tracking-tight text-[#3C1A11] mt-0.5">
               {baseProduct.name}
             </h2>
-            <span className="inline-block mt-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#3C1A11]/10 text-[#3C1A11]">
-              Font: SF Pro Bold
-            </span>
+            <p className="text-xs font-bold text-[#D94F27] mt-1">
+              Note: ₹{customFee} extra will be charged for custom text printing (Font: SF Pro Bold).
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -280,7 +277,7 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
               }}
               placeholder="E.G. SAGAR"
               style={{ fontFamily: STUDIO_FONT, fontWeight: 700 }}
-              className="w-full p-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-lg tracking-tight text-[#3C1A11] outline-none resize-none"
+              className="w-full p-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-lg tracking-wider text-[#3C1A11] outline-none resize-none"
             />
             <span className="text-[10px] font-bold text-[#3C1A11]/50">{text.length}/25 characters</span>
           </div>
@@ -292,8 +289,8 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
                 <button
                   key={c.label}
                   type="button"
-                  onClick={() => selectColor(c.value)}
-                  title={c.label}
+                  onClick={() => handleSelectColor(c.value)}
+                  title={`${c.label} (${c.value})`}
                   style={{ backgroundColor: c.value }}
                   className={`w-9 h-9 rounded-full border-2 cursor-pointer transition-transform ${
                     color.toUpperCase() === c.value.toUpperCase()
@@ -304,23 +301,21 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
               ))}
             </div>
 
-            <div className="flex items-center gap-2.5 pt-1">
-              <label className="relative w-10 h-10 rounded-xl border-2 border-[#3C1A11] overflow-hidden cursor-pointer shrink-0">
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => selectColor(e.target.value)}
-                  aria-label="Pick custom color"
-                  className="absolute -inset-2 w-14 h-14 cursor-pointer"
-                />
-              </label>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => handleSelectColor(e.target.value)}
+                aria-label="Pick custom color"
+                className="w-10 h-10 p-0.5 rounded-lg border-2 border-[#3C1A11] bg-white cursor-pointer shrink-0"
+              />
               <input
                 type="text"
+                maxLength={7}
                 value={hexInput}
                 onChange={(e) => handleHexChange(e.target.value)}
                 placeholder="#FFFFFF"
-                maxLength={7}
-                className="flex-1 h-10 px-3 rounded-xl border-2 border-[#3C1A11]/30 focus:border-[#3C1A11] bg-[#FFF8F0] font-mono text-xs font-black uppercase outline-none"
+                className="flex-1 h-10 px-3 rounded-xl border-2 border-[#3C1A11]/40 focus:border-[#3C1A11] bg-[#FFF8F0] text-xs font-mono font-bold uppercase text-[#3C1A11] outline-none"
               />
             </div>
           </div>

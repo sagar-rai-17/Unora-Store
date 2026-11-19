@@ -49,7 +49,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   }, 0);
 
   const totalCustomizationFee = items.reduce((acc, item) => {
-    return acc + (item.customFee || 0);
+    return acc + (item.customFee || 0) * item.quantity;
   }, 0);
 
 
