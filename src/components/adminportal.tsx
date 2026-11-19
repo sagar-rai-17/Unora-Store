@@ -79,6 +79,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [newProdCategory, setNewProdCategory] = useState<"men" | "women" | "unisex">("unisex");
   const [regularImgUrls, setRegularImgUrls] = useState(["", ""]);
   const [oversizedImgUrls, setOversizedImgUrls] = useState(["", ""]);
+  const [newProdHasOversized, setNewProdHasOversized] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
 
@@ -155,20 +156,22 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     e.preventDefault();
     if (!newProdName.trim() || !newProdPrice) return;
 
-        setCreateLoading(true);
+    setCreateLoading(true);
     try {
       const fallbackImg = "/assets/unora.jpg";
       const convertedRegular = regularImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
-      const convertedOversized = oversizedImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
 
       const finalRegular = convertedRegular.length > 0 ? [...convertedRegular] : [fallbackImg];
       while (finalRegular.length < 2) finalRegular.push(finalRegular[0]);
 
-      const finalOversized = convertedOversized.length > 0 ? [...convertedOversized] : [finalRegular[0]];
-      while (finalOversized.length < 2) finalOversized.push(finalOversized[0]);
+      let finalOversized: string[] = [];
+      if (newProdHasOversized) {
+        const convertedOversized = oversizedImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
+        finalOversized = convertedOversized.length > 0 ? [...convertedOversized] : [finalRegular[0]];
+        while (finalOversized.length < 2) finalOversized.push(finalOversized[0]);
+      }
 
       const mainImg = finalRegular[0];
-
       const newId = `item-${Date.now().toString().slice(-4)}`;
       const priceNum = Number(newProdPrice);
 
@@ -183,6 +186,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         image: mainImg,
         imagesRegular: finalRegular,
         imagesOversized: finalOversized,
+        hasOversized: newProdHasOversized,
         inStock: true,
         createdAt: new Date().toISOString(),
       });
@@ -192,6 +196,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       setNewProdPrice("");
       setRegularImgUrls(["", ""]);
       setOversizedImgUrls(["", ""]);
+      setNewProdHasOversized(true);
       setTimeout(() => setCreateSuccess(false), 2500);
     } catch (err) {
       console.error(err);
@@ -391,6 +396,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         badge: editingItem.badge,
         inStock: editingItem.inStock,
         category: editingItem.category || "unisex",
+        hasOversized: editingItem.hasOversized !== false,
       });
       setSaveSuccess(true);
       setTimeout(() => {
@@ -1030,29 +1036,45 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2">
-                <label className="block text-[10px] font-black uppercase">
-                  Oversized-Fit Images (2 URLs)
+              <div className="pt-2">
+                <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newProdHasOversized}
+                    onChange={(e) => setNewProdHasOversized(e.target.checked)}
+                    className="w-4 h-4 accent-[#D94F27] cursor-pointer"
+                  />
+                  <span className="text-xs font-black uppercase text-[#3C1A11]">
+                    Oversized Fit Available (+₹50)
+                  </span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[0, 1].map((idx) => (
-                    <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
-                      <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
-                      <input
-                        type="text"
-                        value={oversizedImgUrls[idx]}
-                        onChange={(e) => {
-                          const copy = [...oversizedImgUrls];
-                          copy[idx] = e.target.value;
-                          setOversizedImgUrls(copy);
-                        }}
-                        placeholder={`Oversized-fit image ${idx + 1} URL`}
-                        className="flex-1 bg-transparent text-xs font-bold outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
               </div>
+
+              {newProdHasOversized && (
+                <div className="space-y-2 pt-1">
+                  <label className="block text-[10px] font-black uppercase">
+                    Oversized-Fit Images (2 URLs)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[0, 1].map((idx) => (
+                      <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
+                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={oversizedImgUrls[idx]}
+                          onChange={(e) => {
+                            const copy = [...oversizedImgUrls];
+                            copy[idx] = e.target.value;
+                            setOversizedImgUrls(copy);
+                          }}
+                          placeholder={`Oversized-fit image ${idx + 1} URL`}
+                          className="flex-1 bg-transparent text-xs font-bold outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -1134,6 +1156,20 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                       onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
                       className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase mb-1">Fit Options</label>
+                    <select
+                      value={editingItem.hasOversized !== false ? "both" : "regularOnly"}
+                      onChange={(e) =>
+                        setEditingItem({ ...editingItem, hasOversized: e.target.value === "both" })
+                      }
+                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+                    >
+                      <option value="both">Regular & Oversized</option>
+                      <option value="regularOnly">Regular Fit Only</option>
+                    </select>
                   </div>
 
                   <div>

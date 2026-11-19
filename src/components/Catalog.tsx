@@ -15,7 +15,9 @@ export interface Product {
   category?: "men" | "women" | "unisex";
   inStock?: boolean;
   isHidden?: boolean;
+  hasOversized?: boolean;
 }
+
 
 export const campuses = [
   "All",
