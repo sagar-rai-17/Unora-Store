@@ -37,7 +37,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const images = selectedFit === "Oversized-fit"
     ? (product.imagesOversized && product.imagesOversized.length > 0 ? product.imagesOversized : fallbackPair)
     : (product.imagesRegular && product.imagesRegular.length > 0 ? product.imagesRegular : fallbackPair);
-  const unitPrice = selectedFit === "Oversized-fit" ? product.price + 20 : product.price;
+  const unitPrice = selectedFit === "Oversized-fit" ? product.price + 50 : product.price;
 
   return (
     <div className="fixed inset-0 z-[125] bg-[#FFF8F0] overflow-y-auto text-[#3C1A11]">
@@ -103,7 +103,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       : "border-[#3C1A11]/30 hover:border-[#3C1A11] text-[#3C1A11]"
                   }`}
                 >
-                  Regular-fit (₹{product.price})
+                  Regular-fit
                 </button>
                 <button
                   type="button"
@@ -114,7 +114,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       : "border-[#3C1A11]/30 hover:border-[#3C1A11] text-[#3C1A11]"
                   }`}
                 >
-                  Oversized-fit (+₹20)
+                  Oversized-fit
                 </button>
               </div>
             </div>

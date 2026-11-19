@@ -2,13 +2,17 @@ import React from "react";
 
 export const Hero: React.FC = () => {
   return (
-    <section className="hero hero--0" style={{ backgroundImage: `url('/assets/hero.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      <div className="hero__photo" />
-      <div className="hero__content">
-        <span className="eyebrow eyebrow--lime">IIT BOMBAY EXCLUSIVE</span>
-        <h1>CAMPUS, BUT MAKE IT ICONIC.</h1>
-        <p>Official campus-coded drops. Designed by students, for students.</p>
-        <a className="button button--light" href="#shop">
+    <section className="relative w-full h-[85vh] min-h-[500px] overflow-hidden bg-black">
+      <div
+        className="absolute inset-0 w-full h-full bg-contain bg-no-repeat bg-center"
+        style={{ backgroundImage: `url('/assets/hero.png')` }}
+      />
+      <div className="absolute inset-0 bg-black/5" />
+      <div className="absolute inset-x-0 bottom-[27%] z-10 px-4 text-center">
+        <a
+          href="#shop"
+          className="inline-block px-8 py-3.5 bg-black/60 hover:bg-black/90 text-white font-sans font-bold tracking-wider text-sm uppercase rounded-full border border-white/30 backdrop-blur-md transition-all duration-300 shadow-2xl cursor-pointer"
+        >
           ORDER NOW
         </a>
       </div>
