@@ -13,7 +13,7 @@ interface ProductDetailPageProps {
 }
 
 const OVERSIZED_SIZES = ["S", "M", "L", "XL", "XXL"];
-const REGULAR_SIZES = ["S", "M", "L", "XL", "XXL", "XXXL"];
+const REGULAR_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
 const OVERSIZED_CHART = [
   { size: "S", chest: "42", length: "27.5" },
@@ -24,6 +24,7 @@ const OVERSIZED_CHART = [
 ];
 
 const REGULAR_CHART = [
+  { size: "XS", chest: "36", length: "25" },
   { size: "S", chest: "38", length: "26" },
   { size: "M", chest: "40", length: "27" },
   { size: "L", chest: "42", length: "28" },
@@ -51,12 +52,33 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [sizeChartTab, setSizeChartTab] = useState<"size" | "fit">("size");
 
   useBodyScrollLock(isOpen);
-  const hasOversized = product?.hasOversized !== false;
+
+  const fitType: "both" | "regular" | "oversized" =
+    product?.fitType || (product?.hasOversized === false ? "regular" : "both");
+  const hasRegular = fitType === "both" || fitType === "regular";
+  const hasOversized = fitType === "both" || fitType === "oversized";
 
   useEffect(() => {
     if (isOpen && product) {
-      setSelectedFit(product.hasOversized === false ? "Regular-fit" : "Oversized-fit");
-      setSelectedSize("L");
+      const params = new URLSearchParams(window.location.search);
+      const urlFit = params.get("fit");
+      const urlSize = params.get("size");
+
+      const currentFitType =
+        product.fitType || (product.hasOversized === false ? "regular" : "both");
+      const defaultFit = currentFitType === "regular" ? "Regular-fit" : "Oversized-fit";
+
+      const validFit =
+        (urlFit === "Regular-fit" && currentFitType !== "oversized") ||
+        (urlFit === "Oversized-fit" && currentFitType !== "regular")
+          ? urlFit
+          : defaultFit;
+
+      const validSizes = validFit === "Oversized-fit" ? OVERSIZED_SIZES : REGULAR_SIZES;
+      const validSize = urlSize && validSizes.includes(urlSize) ? urlSize : "L";
+
+      setSelectedFit(validFit);
+      setSelectedSize(validSize);
       setQuantity(1);
     }
   }, [isOpen, product]);
@@ -67,8 +89,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleFitChange = (fit: "Regular-fit" | "Oversized-fit") => {
     setSelectedFit(fit);
-    if (fit === "Oversized-fit" && selectedSize === "XXXL") {
-      setSelectedSize("XXL");
+    if (fit === "Oversized-fit") {
+      if (selectedSize === "XS") setSelectedSize("S");
+      if (selectedSize === "XXXL") setSelectedSize("XXL");
     }
   };
 
@@ -81,9 +104,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       : product.imagesRegular && product.imagesRegular.length > 0
       ? product.imagesRegular
       : fallbackPair;
-  const unitPrice = selectedFit === "Oversized-fit" ? product.price + 50 : product.price;
-const displayOriginalPrice = selectedFit === "Oversized-fit" ? product.originalPrice + 50 : product.originalPrice;
-
+  const oversizedBump = fitType === "both" && selectedFit === "Oversized-fit" ? 50 : 0;
+  const unitPrice = product.price + oversizedBump;
+  const displayOriginalPrice = product.originalPrice + oversizedBump;
   return (
     <div className="fixed inset-0 z-[125] bg-[#FFF8F0] overflow-y-auto text-[#3C1A11]">
       <div className="sticky top-0 z-20 bg-[#FFF8F0]/95 backdrop-blur-md border-b-2 border-[#3C1A11] px-6 py-4 flex items-center justify-between">
@@ -136,35 +159,37 @@ const displayOriginalPrice = selectedFit === "Oversized-fit" ? product.originalP
               <p className="text-[11px] font-semibold text-[#3C1A11]/60 mt-0.5">Price incl. of all taxes</p>
             </div>
 
-            {hasOversized && (
-            <div className="space-y-2">
+              <div className="space-y-2">
               <label className="block text-xs font-black uppercase tracking-wider">Select Fit</label>
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleFitChange("Regular-fit")}
-                  className={`h-11 rounded-xl border-2 font-black text-xs uppercase tracking-wider cursor-pointer transition-all ${
-                    selectedFit === "Regular-fit"
-                      ? "bg-[#3C1A11] border-[#3C1A11] text-[#FFE2C7]"
-                      : "border-[#3C1A11]/30 hover:border-[#3C1A11] text-[#3C1A11]"
-                  }`}
-                >
-                  Regular-fit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleFitChange("Oversized-fit")}
-                  className={`h-11 rounded-xl border-2 font-black text-xs uppercase tracking-wider cursor-pointer transition-all ${
-                    selectedFit === "Oversized-fit"
-                      ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
-                      : "border-[#3C1A11]/30 hover:border-[#3C1A11] text-[#3C1A11]"
-                  }`}
-                >
-                  Oversized-fit
-                </button>
+                {hasRegular && (
+                  <button
+                    type="button"
+                    onClick={() => handleFitChange("Regular-fit")}
+                    className={`h-11 rounded-xl border-2 font-black text-xs uppercase tracking-wider cursor-pointer transition-all ${
+                      selectedFit === "Regular-fit"
+                        ? "bg-[#3C1A11] border-[#3C1A11] text-[#FFE2C7]"
+                        : "border-[#3C1A11]/30 hover:border-[#3C1A11] text-[#3C1A11]"
+                    }`}
+                  >
+                    Regular-fit
+                  </button>
+                )}
+                {hasOversized && (
+                  <button
+                    type="button"
+                    onClick={() => handleFitChange("Oversized-fit")}
+                    className={`h-11 rounded-xl border-2 font-black text-xs uppercase tracking-wider cursor-pointer transition-all ${
+                      selectedFit === "Oversized-fit"
+                        ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+                        : "border-[#3C1A11]/30 hover:border-[#3C1A11] text-[#3C1A11]"
+                    }`}
+                  >
+                    Oversized-fit
+                  </button>
+                )}
               </div>
             </div>
-            )}
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -177,7 +202,7 @@ const displayOriginalPrice = selectedFit === "Oversized-fit" ? product.originalP
                   SIZE CHART
                 </button>
               </div>
-              <div className={`grid ${availableSizes.length === 5 ? "grid-cols-5" : "grid-cols-3 sm:grid-cols-6"} gap-2`}>
+              <div className={`grid ${availableSizes.length === 5 ? "grid-cols-5" : "grid-cols-4 sm:grid-cols-7"} gap-2`}>
                 {availableSizes.map((sz) => (
                   <button
                     key={sz}
@@ -377,7 +402,7 @@ const displayOriginalPrice = selectedFit === "Oversized-fit" ? product.originalP
             </div>
 
             {sizeChartTab === "size" ? (
-              <div className={`grid grid-cols-1 ${hasOversized ? "md:grid-cols-2" : ""} gap-4`}>
+              <div className={`grid grid-cols-1 ${hasRegular && hasOversized ? "md:grid-cols-2" : ""} gap-4`}>
                 {hasOversized && (
                   <div className="border-2 border-[#3C1A11]/20 rounded-2xl bg-white overflow-hidden">
                     <div className="bg-[#3C1A11] text-[#BDF119] py-2.5 text-center font-anton text-base uppercase tracking-wider">
@@ -404,29 +429,31 @@ const displayOriginalPrice = selectedFit === "Oversized-fit" ? product.originalP
                   </div>
                 )}
 
-                <div className="border-2 border-[#3C1A11]/20 rounded-2xl bg-white overflow-hidden">
-                  <div className="bg-[#3C1A11] text-[#FFE2C7] py-2.5 text-center font-anton text-base uppercase tracking-wider">
-                    Regular Fit
-                  </div>
-                  <table className="w-full text-center text-xs font-bold">
-                    <thead>
-                      <tr className="border-b border-[#3C1A11]/20 bg-[#FFF8F0]">
-                        <th className="py-2.5">SIZE</th>
-                        <th className="py-2.5">CHEST</th>
-                        <th className="py-2.5">LENGTH</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#3C1A11]/10">
-                      {REGULAR_CHART.map((row) => (
-                        <tr key={row.size}>
-                          <td className="py-2.5 font-black">{row.size}</td>
-                          <td className="py-2.5">{row.chest}</td>
-                          <td className="py-2.5">{row.length}</td>
+                {hasRegular && (
+                  <div className="border-2 border-[#3C1A11]/20 rounded-2xl bg-white overflow-hidden">
+                    <div className="bg-[#3C1A11] text-[#FFE2C7] py-2.5 text-center font-anton text-base uppercase tracking-wider">
+                      Regular Fit
+                    </div>
+                    <table className="w-full text-center text-xs font-bold">
+                      <thead>
+                        <tr className="border-b border-[#3C1A11]/20 bg-[#FFF8F0]">
+                          <th className="py-2.5">SIZE</th>
+                          <th className="py-2.5">CHEST</th>
+                          <th className="py-2.5">LENGTH</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-[#3C1A11]/10">
+                        {REGULAR_CHART.map((row) => (
+                          <tr key={row.size}>
+                            <td className="py-2.5 font-black">{row.size}</td>
+                            <td className="py-2.5">{row.chest}</td>
+                            <td className="py-2.5">{row.length}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="border-2 border-[#3C1A11]/20 rounded-2xl bg-white p-4 flex items-center justify-center">

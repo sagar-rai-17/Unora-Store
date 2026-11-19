@@ -79,7 +79,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [newProdCategory, setNewProdCategory] = useState<"men" | "women" | "unisex">("unisex");
   const [regularImgUrls, setRegularImgUrls] = useState(["", ""]);
   const [oversizedImgUrls, setOversizedImgUrls] = useState(["", ""]);
-  const [newProdHasOversized, setNewProdHasOversized] = useState(true);
+  const [newProdFitType, setNewProdFitType] = useState<"both" | "regular" | "oversized">("both");
   const [createLoading, setCreateLoading] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
 
@@ -159,19 +159,22 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     setCreateLoading(true);
     try {
       const fallbackImg = "/assets/unora.jpg";
-      const convertedRegular = regularImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
-
-      const finalRegular = convertedRegular.length > 0 ? [...convertedRegular] : [fallbackImg];
-      while (finalRegular.length < 2) finalRegular.push(finalRegular[0]);
-
+      let finalRegular: string[] = [];
       let finalOversized: string[] = [];
-      if (newProdHasOversized) {
+
+      if (newProdFitType === "both" || newProdFitType === "regular") {
+        const convertedRegular = regularImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
+        finalRegular = convertedRegular.length > 0 ? [...convertedRegular] : [fallbackImg];
+        while (finalRegular.length < 2) finalRegular.push(finalRegular[0]);
+      }
+
+      if (newProdFitType === "both" || newProdFitType === "oversized") {
         const convertedOversized = oversizedImgUrls.map(u => convertGoogleDriveUrl(u)).filter(Boolean);
-        finalOversized = convertedOversized.length > 0 ? [...convertedOversized] : [finalRegular[0]];
+        finalOversized = convertedOversized.length > 0 ? [...convertedOversized] : [finalRegular[0] || fallbackImg];
         while (finalOversized.length < 2) finalOversized.push(finalOversized[0]);
       }
 
-      const mainImg = finalRegular[0];
+      const mainImg = finalRegular[0] || finalOversized[0] || fallbackImg;
       const newId = `item-${Date.now().toString().slice(-4)}`;
       const priceNum = Number(newProdPrice);
 
@@ -186,7 +189,8 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         image: mainImg,
         imagesRegular: finalRegular,
         imagesOversized: finalOversized,
-        hasOversized: newProdHasOversized,
+        fitType: newProdFitType,
+        hasOversized: newProdFitType !== "regular",
         inStock: true,
         createdAt: new Date().toISOString(),
       });
@@ -196,7 +200,7 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
       setNewProdPrice("");
       setRegularImgUrls(["", ""]);
       setOversizedImgUrls(["", ""]);
-      setNewProdHasOversized(true);
+      setNewProdFitType("both");
       setTimeout(() => setCreateSuccess(false), 2500);
     } catch (err) {
       console.error(err);
@@ -387,6 +391,9 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
     e.preventDefault();
     if (!editingItem) return;
 
+    const resolvedFitType =
+      editingItem.fitType || (editingItem.hasOversized === false ? "regular" : "both");
+
     try {
       await updateDoc(doc(db, "inventory", editingItem.id), {
         name: editingItem.name,
@@ -396,7 +403,8 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
         badge: editingItem.badge,
         inStock: editingItem.inStock,
         category: editingItem.category || "unisex",
-        hasOversized: editingItem.hasOversized !== false,
+        fitType: resolvedFitType,
+        hasOversized: resolvedFitType !== "regular",
       });
       setSaveSuccess(true);
       setTimeout(() => {
@@ -1037,21 +1045,46 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
               </div>
 
               <div className="pt-2">
-                <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={newProdHasOversized}
-                    onChange={(e) => setNewProdHasOversized(e.target.checked)}
-                    className="w-4 h-4 accent-[#D94F27] cursor-pointer"
-                  />
-                  <span className="text-xs font-black uppercase text-[#3C1A11]">
-                    Oversized Fit Available (+₹50)
-                  </span>
-                </label>
+                <label className="block text-[10px] font-black uppercase mb-1">Fit Options</label>
+                <select
+                  value={newProdFitType}
+                  onChange={(e) => setNewProdFitType(e.target.value as "both" | "regular" | "oversized")}
+                  className="w-full sm:w-64 h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+                >
+                  <option value="both">Regular & Oversized</option>
+                  <option value="regular">Regular Fit Only</option>
+                  <option value="oversized">Oversized Fit Only</option>
+                </select>
               </div>
 
-              {newProdHasOversized && (
-                <div className="space-y-2 pt-1">
+              {(newProdFitType === "both" || newProdFitType === "regular") && (
+                <div className="space-y-2 pt-2">
+                  <label className="block text-[10px] font-black uppercase">
+                    Regular-Fit Images (2 URLs)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[0, 1].map((idx) => (
+                      <div key={idx} className="flex items-center gap-2 border border-[#3C1A11]/30 p-2 rounded-xl bg-[#FFF8F0]">
+                        <span className="text-[10px] font-black uppercase text-[#3C1A11]/60">#{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={regularImgUrls[idx]}
+                          onChange={(e) => {
+                            const copy = [...regularImgUrls];
+                            copy[idx] = e.target.value;
+                            setRegularImgUrls(copy);
+                          }}
+                          placeholder={`Regular-fit image ${idx + 1} URL`}
+                          className="flex-1 bg-transparent text-xs font-bold outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(newProdFitType === "both" || newProdFitType === "oversized") && (
+                <div className="space-y-2 pt-2">
                   <label className="block text-[10px] font-black uppercase">
                     Oversized-Fit Images (2 URLs)
                   </label>
@@ -1161,14 +1194,19 @@ const handleToggleReelsVisibility = async (enabled: boolean) => {
                   <div>
                     <label className="block text-[10px] font-black uppercase mb-1">Fit Options</label>
                     <select
-                      value={editingItem.hasOversized !== false ? "both" : "regularOnly"}
+                      value={editingItem.fitType || (editingItem.hasOversized === false ? "regular" : "both")}
                       onChange={(e) =>
-                        setEditingItem({ ...editingItem, hasOversized: e.target.value === "both" })
+                        setEditingItem({
+                          ...editingItem,
+                          fitType: e.target.value,
+                          hasOversized: e.target.value !== "regular",
+                        })
                       }
                       className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
                     >
                       <option value="both">Regular & Oversized</option>
-                      <option value="regularOnly">Regular Fit Only</option>
+                      <option value="regular">Regular Fit Only</option>
+                      <option value="oversized">Oversized Fit Only</option>
                     </select>
                   </div>
 

@@ -16,6 +16,7 @@ export interface Product {
   inStock?: boolean;
   isHidden?: boolean;
   hasOversized?: boolean;
+  fitType?: "both" | "regular" | "oversized";
 }
 
 

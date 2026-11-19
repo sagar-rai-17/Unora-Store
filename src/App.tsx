@@ -99,6 +99,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedId = params.get("id");
+    if (!sharedId) return;
+
+    const allProducts = inventoryProducts.length > 0 ? inventoryProducts : products;
+    const match = allProducts.find((p) => p.id === sharedId);
+    if (match) {
+      setSelectedDetailProduct(match);
+    }
+  }, [inventoryProducts]);
+
+  useEffect(() => {
     localStorage.setItem("unora_cart", JSON.stringify(cartItems));
     if (auth.currentUser) {
       setDoc(
@@ -454,7 +466,12 @@ export default function App() {
         <ProductDetailPage
           product={selectedDetailProduct}
           isOpen={!!selectedDetailProduct}
-          onClose={() => setSelectedDetailProduct(null)}
+          onClose={() => {
+            setSelectedDetailProduct(null);
+            if (window.location.search) {
+              window.history.replaceState({}, "", window.location.pathname);
+            }
+          }}
           onAddToCart={handleAddToCartFromDetail}
           onToggleWishlist={handleToggleWishlist}
           isWishlisted={selectedDetailProduct ? wishlistItems.includes(selectedDetailProduct.id) : false}
