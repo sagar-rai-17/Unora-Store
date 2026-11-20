@@ -6,7 +6,7 @@ import { buildUpiPaymentUri, UNORA_UPI_ID } from "../utils/upiQr";
 
 const MAX_SCREENSHOT_BYTES = 800 * 1024;
 const UPI_ID_REGEX = /^[a-zA-Z0-9._-]{2,}@[a-zA-Z0-9.-]{2,}$/;
-const UTR_REGEX = /^\d{12}$/;
+const TXN_ID_REGEX = /^[a-zA-Z0-9_-]{4,50}$/;
 
 interface UpiPaymentStepProps {
   orderPayload: {
@@ -93,8 +93,8 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
       setError("Please enter a valid UPI ID in username@handle format (e.g. student@okicici).");
       return;
     }
-    if (!UTR_REGEX.test(cleanRef)) {
-      setError("UPI Transaction / Reference ID must be exactly 12 numeric digits.");
+    if (!cleanRef || !TXN_ID_REGEX.test(cleanRef)) {
+      setError("Please enter a valid UPI Transaction / Reference ID (letters and numbers allowed, no spaces).");
       return;
     }
     if (!screenshotBase64) {
@@ -183,6 +183,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
             </label>
             <input
               type="text"
+              required
               value={payerUpiId}
               onChange={(e) => setPayerUpiId(e.target.value.replace(/\s/g, ""))}
               placeholder="student@okicici"
@@ -196,15 +197,15 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
             </label>
             <input
               type="text"
-              inputMode="numeric"
-              maxLength={12}
+              required
+              maxLength={50}
               value={transactionRefId}
-              onChange={(e) => setTransactionRefId(e.target.value.replace(/\D/g, "").slice(0, 12))}
-              placeholder="Write 12 Digit Transaction id"
+              onChange={(e) => setTransactionRefId(e.target.value.replace(/\s/g, ""))}
+              placeholder="Enter UPI Transaction ID / UTR"
               className="w-full h-11 px-3.5 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-sm font-mono font-bold outline-none"
             />
             <span className="text-[10px] font-bold text-[#3C1A11]/60 mt-1 block">
-              {transactionRefId.length}/12 digits · Note- Transaction Timestamp is being recorded automatically
+              Letters & digits allowed · Transaction timestamp is recorded automatically
             </span>
           </div>
 
