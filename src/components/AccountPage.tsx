@@ -169,7 +169,21 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                     </div>
                     <div>
                       <span className="text-[10px] uppercase text-[#3C1A11]/50 block">PAYMENT</span>
-                      <span>DONE</span>
+                      <span
+                        className={
+                          order.paymentStatus === "rejected"
+                            ? "text-[#D94F27]"
+                            : order.paymentStatus === "verified"
+                            ? "text-[#22543D]"
+                            : ""
+                        }
+                      >
+                        {order.paymentStatus === "verified"
+                          ? "VERIFIED"
+                          : order.paymentStatus === "rejected"
+                          ? "REJECTED"
+                          : "PENDING"}
+                      </span>
                     </div>
                   </div>
                   

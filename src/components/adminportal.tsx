@@ -890,6 +890,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                       )}
                     </div>
 
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-[#3C1A11]/60 mb-1">
+                        Payment Feedback / Rejection Reason (Shown in Customer Order History)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={paymentFeedbacks[order.docId] || ""}
+                        onChange={(e) =>
+                          setPaymentFeedbacks((prev) => ({
+                            ...prev,
+                            [order.docId]: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. UTR mismatch, blurry screenshot, or amount short by ₹40"
+                        className="w-full p-2.5 rounded-xl border border-[#3C1A11]/30 bg-white text-xs font-bold text-[#3C1A11] outline-none resize-none"
+                      />
+                    </div>
+
                     <div className="flex gap-3 pt-1">
                       <button
                         type="button"

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import type { CartItem } from "./CartSidebar";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../firebaseConfig";
+import { auth } from "../firebaseConfig";
 import emailjs from "@emailjs/browser";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { UpiPaymentStep } from "./UpiPaymentStep";
@@ -101,50 +100,15 @@ export const Checkout: React.FC<CheckoutProps> = ({
     }
 
     setErrors({});
-    setIsSubmitting(true);
-
-    try {
-      const generatedOrderId = `UNR-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
+    const generatedOrderId = `UNR-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
     const finalCampus = selectedCampus === "Others" ? otherCampus.trim() : selectedCampus;
-      const createdDocRef = await addDoc(collection(db, "orders"), {
-        userId: auth.currentUser?.uid || "guest",
-        customerEmail: auth.currentUser?.email || "",
-        orderId: generatedOrderId,
-        fullName: fullName.trim(),
-        mobile: mobile.trim(),
-        campus: finalCampus,
-        hostelName: hostelName.trim(),
-        roomNumber: roomNumber.trim(),
-        deliveryNote: deliveryNote.trim(),
-        paymentMethod: "upi",
-        paymentStatus: "pending_verification",
-        items: items.map((it) => ({
-          name: it.name,
-          size: it.size,
-          color: it.color || "",
-          style: it.style || "",
-          quantity: it.quantity,
-          basePrice: it.basePrice,
-          customFee: it.customFee || 0,
-          customText: it.customText || "",
-          ...(it.studioDesign ? { studioDesign: it.studioDesign } : {}),
-        })),
-        grandTotal: grandTotal,
-        status: "Received",
-        createdAt: serverTimestamp(),
-      });
 
-    setIsSubmitting(false);
     setPendingOrder({
       orderId: generatedOrderId,
       grandTotal,
       hostel: hostelName.trim(),
       campus: finalCampus,
     });
-    } catch (error) {
-      console.error(error);
-      setIsSubmitting(false);
-    }
   };
 
   const handlePaymentClaimSubmitted = async (
