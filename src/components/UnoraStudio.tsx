@@ -253,7 +253,7 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
         <div className="lg:col-span-5 bg-white border-2 border-[#3C1A11] rounded-3xl p-6 space-y-5 h-fit">
           <div>
             <span className="text-[10px] font-black uppercase tracking-widest text-[#D94F27]">
-              CUSTOMIZE BASE PIECE (+₹{customFee})
+              CUSTOMIZE BASE PIECE
             </span>
             <h2 className="font-anton text-3xl uppercase tracking-tight text-[#3C1A11] mt-0.5">
               {baseProduct.name}

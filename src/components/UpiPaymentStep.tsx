@@ -1,41 +1,45 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { buildUpiPaymentUri, UNORA_UPI_ID } from "../utils/upiQr";
 
-const MAX_SCREENSHOT_BYTES = 800 * 1024; // 800 KB safety cap under Firestore 1MB doc limit
+const MAX_SCREENSHOT_BYTES = 800 * 1024;
+const UPI_ID_REGEX = /^[a-zA-Z0-9._-]{2,}@[a-zA-Z0-9.-]{2,}$/;
+const UTR_REGEX = /^\d{12}$/;
 
 interface UpiPaymentStepProps {
-  orderDocId: string;
-  orderId: string;
-  grandTotal: number;
-  hostelName: string;
-  campusName: string;
+  orderPayload: {
+    userId: string;
+    customerEmail: string;
+    orderId: string;
+    fullName: string;
+    mobile: string;
+    campus: string;
+    hostelName: string;
+    roomNumber: string;
+    deliveryNote: string;
+    paymentMethod: "upi";
+    paymentStatus: "pending_verification";
+    items: any[];
+    grandTotal: number;
+    status: "Received";
+  };
   onSubmitted: (orderId: string, hostel: string, campus: string) => void;
 }
 
-function getDefaultLocalDateTime(): string {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
 export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
-  orderDocId,
-  orderId,
-  grandTotal,
-  hostelName,
-  campusName,
+  orderPayload,
   onSubmitted,
 }) => {
+  const { orderId, grandTotal, hostelName, campus } = orderPayload;
   const [payerUpiId, setPayerUpiId] = useState("");
   const [transactionRefId, setTransactionRefId] = useState("");
-  const [paymentTime, setPaymentTime] = useState(getDefaultLocalDateTime);
   const [screenshotBase64, setScreenshotBase64] = useState<string>("");
   const [screenshotName, setScreenshotName] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const upiUri = buildUpiPaymentUri({
     amount: grandTotal,
@@ -72,21 +76,25 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const handleRemoveScreenshot = () => {
+    setScreenshotBase64("");
+    setScreenshotName("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUpi = payerUpiId.trim();
     const cleanRef = transactionRefId.trim();
 
-    if (!cleanUpi || !cleanUpi.includes("@")) {
-      setError("Please enter the valid UPI ID you sent the payment from (e.g. name@okaxis).");
+    if (!UPI_ID_REGEX.test(cleanUpi)) {
+      setError("Please enter a valid UPI ID in username@handle format (e.g. student@okicici).");
       return;
     }
-    if (cleanRef.length < 6) {
-      setError("Please enter the UPI Transaction / Reference ID (UTR).");
-      return;
-    }
-    if (!paymentTime) {
-      setError("Please select the date and time you made the payment.");
+    if (!UTR_REGEX.test(cleanRef)) {
+      setError("UPI Transaction / Reference ID must be exactly 12 numeric digits.");
       return;
     }
     if (!screenshotBase64) {
@@ -97,19 +105,29 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
     setError(null);
     setIsSubmitting(true);
 
+    const exactSubmissionTime = new Date().toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+
     try {
-      // Only payment-claim fields are updated; paymentStatus stays "pending_verification"
-      // until an admin manually verifies and approves in Admin Portal.
-      await updateDoc(doc(db, "orders", orderDocId), {
+      await addDoc(collection(db, "orders"), {
+        ...orderPayload,
         payerUpiId: cleanUpi,
         transactionRefId: cleanRef,
-        paymentTime,
+        paymentTime: exactSubmissionTime,
         paymentScreenshotBase64: screenshotBase64,
         submittedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
       });
 
       setIsSubmitting(false);
-      onSubmitted(orderId, hostelName, campusName);
+      onSubmitted(orderId, hostelName, campus);
     } catch (err) {
       console.error("Failed to submit payment details:", err);
       setError("Could not submit payment details. Please check your connection and try again.");
@@ -155,48 +173,39 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
               SUBMIT PAYMENT PROOF
             </h2>
             <p className="text-xs font-semibold text-[#3C1A11]/70 mt-1">
-              Pay ₹{grandTotal.toLocaleString("en-IN")}.00 to <span className="font-mono font-bold">{UNORA_UPI_ID}</span>, then submit your transfer details below.
+              Pay ₹{grandTotal.toLocaleString("en-IN")}.00 to <span className="font-mono font-bold">Unora Clothin</span>, then submit your transfer details below.
             </p>
           </div>
 
           <div>
             <label className="block text-xs font-black uppercase tracking-wider mb-1">
-              Your UPI ID (Sent From) *
+              Your UPI ID (username@handle) *
             </label>
             <input
               type="text"
               value={payerUpiId}
-              onChange={(e) => setPayerUpiId(e.target.value)}
+              onChange={(e) => setPayerUpiId(e.target.value.replace(/\s/g, ""))}
               placeholder="student@okicici"
               className="w-full h-11 px-3.5 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-sm font-bold outline-none"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider mb-1">
-                UPI Transaction / Ref ID *
-              </label>
-              <input
-                type="text"
-                value={transactionRefId}
-                onChange={(e) => setTransactionRefId(e.target.value)}
-                placeholder="e.g. 432412345678"
-                className="w-full h-11 px-3.5 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-sm font-mono font-bold outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider mb-1">
-                Payment Date & Time *
-              </label>
-              <input
-                type="datetime-local"
-                value={paymentTime}
-                onChange={(e) => setPaymentTime(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-xs font-bold outline-none"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-black uppercase tracking-wider mb-1">
+              UPI Transaction / Reference ID *
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              value={transactionRefId}
+              onChange={(e) => setTransactionRefId(e.target.value.replace(/\D/g, "").slice(0, 12))}
+              placeholder="Write 12 Digit Transaction id"
+              className="w-full h-11 px-3.5 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-sm font-mono font-bold outline-none"
+            />
+            <span className="text-[10px] font-bold text-[#3C1A11]/60 mt-1 block">
+              {transactionRefId.length}/12 digits · Note- Transaction Timestamp is being recorded automatically
+            </span>
           </div>
 
           <div>
@@ -204,6 +213,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
               Payment Screenshot (Max 800 KB) *
             </label>
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleFileChange}
@@ -215,11 +225,21 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
               </p>
             )}
             {screenshotBase64 && (
-              <img
-                src={screenshotBase64}
-                alt="Payment screenshot preview"
-                className="mt-2 h-28 w-auto rounded-xl border-2 border-[#3C1A11] object-contain bg-[#FFF8F0]"
-              />
+              <div className="relative inline-block mt-2">
+                <img
+                  src={screenshotBase64}
+                  alt="Payment screenshot preview"
+                  className="h-28 w-auto rounded-xl border-2 border-[#3C1A11] object-contain bg-[#FFF8F0]"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveScreenshot}
+                  aria-label="Remove screenshot"
+                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#D94F27] hover:bg-[#3C1A11] text-[#FFE2C7] border-2 border-[#3C1A11] flex items-center justify-center text-xs font-black cursor-pointer shadow-md"
+                >
+                  ✕
+                </button>
+              </div>
             )}
           </div>
 

@@ -301,7 +301,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     const shareUrl = `${window.location.origin}/?id=${product.id}&fit=${selectedFit}&size=${selectedSize}`;
-                    const text = `Check out the ${product.name} (${selectedFit}, Size: ${selectedSize}) on Unora: ${shareUrl}`;
+                    const text = `Check out the ${product.name} (${selectedFit}, Size: ${selectedSize}) on Unora Clothin: ${shareUrl}`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
                   }}
                   aria-label="Share on WhatsApp"

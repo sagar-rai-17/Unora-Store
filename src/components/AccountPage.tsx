@@ -10,6 +10,7 @@ export interface OrderRecord {
   itemsCount: number;
   status: "Received" | "In Transit" | "Delivered";
   paymentStatus?: "pending_verification" | "verified" | "rejected";
+  paymentFeedback?: string;
 }
 
 interface AccountPageProps {
@@ -171,6 +172,21 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                       <span>DONE</span>
                     </div>
                   </div>
+                  
+                  {order.paymentFeedback && order.paymentFeedback.trim() !== "" && (
+                    <div
+                      className={`p-3 rounded-xl border text-xs font-bold ${
+                        order.paymentStatus === "rejected"
+                          ? "bg-[#D94F27]/10 border-[#D94F27] text-[#D94F27]"
+                          : "bg-[#FFF8F0] border-[#3C1A11]/20 text-[#3C1A11]"
+                      }`}
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-wider block mb-0.5">
+                        {order.paymentStatus === "rejected" ? "PAYMENT REJECTION NOTE" : "PAYMENT NOTE"}
+                      </span>
+                      <p>{order.paymentFeedback}</p>
+                    </div>
+                  )}
 
                   <div className="pt-2 border-t border-[#3C1A11]/10 flex justify-end">
                     <button

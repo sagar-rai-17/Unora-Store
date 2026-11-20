@@ -26,6 +26,7 @@ import { ProductDetailPage } from "./components/ProductDetailPage";
 import { StaticInfoModal, type StaticInfoType } from "./components/StaticInfoModal";
 import { AboutUsModal } from "./components/AboutUsModal";
 import { FeedbackModal } from "./components/FeedbackModal";
+import { useHistoryOverlay} from "./hooks/useHistoryOverlay";
 
 export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
@@ -132,6 +133,26 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
+  const closeDetailProduct = useCallback(() => {
+    setSelectedDetailProduct(null);
+    if (window.location.search) {
+      window.history.replaceState(window.history.state, "", window.location.pathname);
+    }
+  }, []);
+
+  useHistoryOverlay("product-detail", !!selectedDetailProduct, closeDetailProduct);
+  useHistoryOverlay("studio", !!studioProduct, useCallback(() => setStudioProduct(null), []));
+  useHistoryOverlay("cart", isCartOpen, useCallback(() => setIsCartOpen(false), []));
+  useHistoryOverlay("checkout", isCheckoutOpen, useCallback(() => setIsCheckoutOpen(false), []));
+  useHistoryOverlay("order-success", isOrderSuccessOpen, useCallback(() => setIsOrderSuccessOpen(false), []));
+  useHistoryOverlay("auth", isAuthOpen, useCallback(() => setIsAuthOpen(false), []));
+  useHistoryOverlay("account", isAccountOpen, useCallback(() => setIsAccountOpen(false), []));
+  useHistoryOverlay("admin", isAdminOpen, useCallback(() => setIsAdminOpen(false), []));
+  useHistoryOverlay("wishlist", isWishlistOpen, useCallback(() => setIsWishlistOpen(false), []));
+  useHistoryOverlay("tracking", !!trackingOrderId, useCallback(() => setTrackingOrderId(null), []));
+  useHistoryOverlay("about", isAboutOpen, useCallback(() => setIsAboutOpen(false), []));
+  useHistoryOverlay("feedback", isFeedbackOpen, useCallback(() => setIsFeedbackOpen(false), []));
+  useHistoryOverlay("static-info", !!staticInfoType, useCallback(() => setStaticInfoType(null), []));
 
   useEffect(() => {
     let unsubscribeOrders: (() => void) | null = null;
@@ -182,7 +203,12 @@ export default function App() {
             campusName: d.data().campus || "IIT",
             total: Number(d.data().grandTotal || 0),
             itemsCount: d.data().items?.reduce((a: number, i: any) => a + (i.quantity || 1), 0) || 0,
-            status: d.data().status || "Received"
+            status: d.data().status || "Received",
+            paymentStatus:
+              d.data().paymentStatus === "verified" || d.data().paymentStatus === "rejected"
+                ? d.data().paymentStatus
+                : "pending_verification",
+            paymentFeedback: d.data().paymentFeedback || ""
           })));
         });
       } else {
@@ -478,17 +504,11 @@ export default function App() {
         <ProductDetailPage
           product={selectedDetailProduct}
           isOpen={!!selectedDetailProduct}
-          onClose={() => {
-            setSelectedDetailProduct(null);
-            if (window.location.search) {
-              window.history.replaceState({}, "", window.location.pathname);
-            }
-          }}
+          onClose={closeDetailProduct}
           onAddToCart={handleAddToCartFromDetail}
           onToggleWishlist={handleToggleWishlist}
           isWishlisted={selectedDetailProduct ? wishlistItems.includes(selectedDetailProduct.id) : false}
           onLaunchStudio={(prod) => {
-            setSelectedDetailProduct(null);
             setStudioProduct(prod);
           }}
         />
@@ -562,7 +582,6 @@ export default function App() {
               window.setTimeout(() => setToast(false), 3000);
               return;
             }
-            setIsCartOpen(false);
             setIsCheckoutOpen(true);
           }}
         />
@@ -585,6 +604,7 @@ export default function App() {
             setActiveCoupon(null);
             setOrderDetails({ id: orderId, hostel: hostel || "Hostel", campus: campus || "IIT" });
             setIsCheckoutOpen(false);
+            setIsCartOpen(false);
             setIsOrderSuccessOpen(true);
           }}
         />
@@ -595,7 +615,6 @@ export default function App() {
           hostelName={orderDetails.hostel}
           campusName={orderDetails.campus}
           onTrackOrder={(id) => {
-            setIsOrderSuccessOpen(false);
             setTrackingOrderId(id);
           }}
         />
@@ -617,7 +636,6 @@ export default function App() {
           orders={orders}
           onLogout={handleLogout}
           onTrackOrder={(id) => {
-            setIsAccountOpen(false);
             setTrackingOrderId(id);
           }}
         />
@@ -631,7 +649,6 @@ export default function App() {
           isOpen={isAboutOpen}
           onClose={() => setIsAboutOpen(false)}
           onOpenFeedback={() => {
-            setIsAboutOpen(false);
             setIsFeedbackOpen(true);
           }}
         />

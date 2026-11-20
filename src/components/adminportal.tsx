@@ -4,7 +4,6 @@ import { signOut, onAuthStateChanged, type User } from "firebase/auth";
 import { auth, db } from "../firebaseConfig";
 import { checkIsAdmin } from "../utils/adminCheck";
 import { convertGoogleDriveUrl } from "../utils/driveImage";
-
 const CAMPUSES = [
   "ALL",
   "IIT Bombay",
@@ -45,6 +44,7 @@ export interface AdminOrder {
   id: string;
   docId: string;
   fullName: string;
+  customerEmail?: string;
   mobile: string;
   campus: string;
   hostelName: string;
@@ -52,6 +52,7 @@ export interface AdminOrder {
   deliveryNote?: string;
   paymentMethod: "upi" | "cod";
   paymentStatus: PaymentVerificationStatus;
+  paymentFeedback?: string;
   payerUpiId?: string;
   transactionRefId?: string;
   paymentTime?: string;
@@ -75,6 +76,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [paymentFeedbacks, setPaymentFeedbacks] = useState<Record<string, string>>({});
   const [inventory, setInventory] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -397,6 +399,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
             status: (data.status as OrderStatus) || "Received",
             items: Array.isArray(data.items) ? data.items : [],
             createdAt: formattedDate,
+            customerEmail: data.customerEmail || "",
+            paymentFeedback: data.paymentFeedback || "",
           };
         });
         setOrders(fetched);
@@ -493,6 +497,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
     order: AdminOrder,
     decision: "verified" | "rejected"
   ) => {
+    const feedbackText = (paymentFeedbacks[order.docId] || "").trim();
     try {
       setVerifyingId(order.docId);
       const orderRef = doc(db, "orders", order.docId);
@@ -501,15 +506,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
         decision === "verified"
           ? {
               paymentStatus: "verified",
+              paymentFeedback: feedbackText,
               verifiedAt: serverTimestamp(),
               verifiedBy: currentUser?.email || currentUser?.uid || "admin",
             }
           : {
               paymentStatus: "rejected",
+              paymentFeedback: feedbackText || "Payment proof could not be verified. Please check your UTR/screenshot and contact support.",
               rejectedAt: serverTimestamp(),
               rejectedBy: currentUser?.email || currentUser?.uid || "admin",
             }
       );
+
+      setPaymentFeedbacks((prev) => {
+        const next = { ...prev };
+        delete next[order.docId];
+        return next;
+      });
     } catch (err) {
       console.error("Failed to update payment status:", err);
     } finally {
@@ -541,15 +554,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   };
 
   const pendingVerificationOrders = useMemo(() => {
-    return orders.filter((order) => order.paymentStatus === "pending_verification");
+    return orders.filter(
+      (order) =>
+        order.paymentStatus === "pending_verification" &&
+        Boolean(order.transactionRefId && order.paymentScreenshotBase64)
+    );
+  }, [orders]);
+
+  const validOrders = useMemo(() => {
+    return orders.filter(
+      (order) =>
+        order.paymentStatus !== "pending_verification" ||
+        Boolean(order.transactionRefId && order.paymentScreenshotBase64)
+    );
   }, [orders]);
 
   const metrics = useMemo(() => {
-    const totalOrders = orders.length;
-    const totalRevenue = orders
+    const totalOrders = validOrders.length;
+    const totalRevenue = validOrders
       .filter((order) => order.paymentStatus === "verified")
       .reduce((acc, order) => acc + order.grandTotal, 0);
-    const customItemsCount = orders.reduce((acc, order) => {
+    const customItemsCount = validOrders.reduce((acc, order) => {
       const customsInOrder = order.items.reduce((itemAcc, item) => {
         return itemAcc + (item.customText && item.customText.trim() !== "" ? item.quantity : 0);
       }, 0);
@@ -557,10 +582,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
     }, 0);
 
     return { totalOrders, totalRevenue, customItemsCount };
-  }, [orders]);
+  }, [validOrders]);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+    return validOrders.filter((order) => {
       const matchesCampus = selectedCampus === "ALL" || order.campus.toLowerCase() === selectedCampus.toLowerCase();
       const matchesStatus = selectedStatusFilter === "ALL" || order.status === selectedStatusFilter;
       const matchesSearch =
@@ -571,7 +596,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
 
       return matchesCampus && matchesStatus && matchesSearch;
     });
-  }, [orders, selectedCampus, selectedStatusFilter, searchQuery]);
+  }, [validOrders, selectedCampus, selectedStatusFilter, searchQuery]);
 
   if (!isOpen) return null;
 

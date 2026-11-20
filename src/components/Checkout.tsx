@@ -26,6 +26,7 @@ const CAMPUSES = [
   "IIT Hyderabad",
   "IIT Gandhinagar",
   "IIT (ISM) Dhanbad",
+  "Others",
 ];
 
 export const Checkout: React.FC<CheckoutProps> = ({
@@ -37,16 +38,17 @@ export const Checkout: React.FC<CheckoutProps> = ({
 }) => {
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
-  const [selectedCampus, setSelectedCampus] = useState(CAMPUSES[0]);
+  const [selectedCampus, setSelectedCampus] = useState("");
+  const [otherCampus, setOtherCampus] = useState("");
   const [hostelName, setHostelName] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
   const paymentMethod = "upi";
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
 
   const [pendingOrder, setPendingOrder] = useState<{
-    docId: string;
     orderId: string;
     grandTotal: number;
     hostel: string;
@@ -87,6 +89,11 @@ export const Checkout: React.FC<CheckoutProps> = ({
     if (!roomNumber.trim()) {
       newErrors.roomNumber = "Room Number is mandatory.";
     }
+    if (!selectedCampus) {
+      newErrors.campus = "Please select your campus.";
+    } else if (selectedCampus === "Others" && !otherCampus.trim()) {
+      newErrors.otherCampus = "Please enter your college / campus name.";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -98,14 +105,14 @@ export const Checkout: React.FC<CheckoutProps> = ({
 
     try {
       const generatedOrderId = `UNR-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
-
+    const finalCampus = selectedCampus === "Others" ? otherCampus.trim() : selectedCampus;
       const createdDocRef = await addDoc(collection(db, "orders"), {
         userId: auth.currentUser?.uid || "guest",
         customerEmail: auth.currentUser?.email || "",
         orderId: generatedOrderId,
         fullName: fullName.trim(),
         mobile: mobile.trim(),
-        campus: selectedCampus,
+        campus: finalCampus,
         hostelName: hostelName.trim(),
         roomNumber: roomNumber.trim(),
         deliveryNote: deliveryNote.trim(),
@@ -129,12 +136,11 @@ export const Checkout: React.FC<CheckoutProps> = ({
 
       setIsSubmitting(false);
       setPendingOrder({
-        docId: createdDocRef.id,
-        orderId: generatedOrderId,
-        grandTotal,
-        hostel: hostelName.trim(),
-        campus: selectedCampus,
-      });
+      orderId: generatedOrderId,
+      grandTotal,
+      hostel: hostelName.trim(),
+      campus: finalCampus,
+    });
     } catch (error) {
       console.error(error);
       setIsSubmitting(false);
@@ -211,11 +217,32 @@ export const Checkout: React.FC<CheckoutProps> = ({
 
       {pendingOrder ? (
         <UpiPaymentStep
-          orderDocId={pendingOrder.docId}
-          orderId={pendingOrder.orderId}
-          grandTotal={pendingOrder.grandTotal}
-          hostelName={pendingOrder.hostel}
-          campusName={pendingOrder.campus}
+          orderPayload={{
+            userId: auth.currentUser?.uid || "guest",
+            customerEmail: auth.currentUser?.email || "",
+            orderId: pendingOrder.orderId,
+            fullName: fullName.trim(),
+            mobile: mobile.trim(),
+            campus: pendingOrder.campus,
+            hostelName: pendingOrder.hostel,
+            roomNumber: roomNumber.trim(),
+            deliveryNote: deliveryNote.trim(),
+            paymentMethod: "upi",
+            paymentStatus: "pending_verification",
+            items: items.map((it) => ({
+              name: it.name,
+              size: it.size,
+              color: it.color || "",
+              style: it.style || "",
+              quantity: it.quantity,
+              basePrice: it.basePrice,
+              customFee: it.customFee || 0,
+              customText: it.customText || "",
+              ...(it.studioDesign ? { studioDesign: it.studioDesign } : {}),
+            })),
+            grandTotal: pendingOrder.grandTotal,
+            status: "Received",
+          }}
           onSubmitted={handlePaymentClaimSubmitted}
         />
       ) : (
@@ -283,12 +310,33 @@ export const Checkout: React.FC<CheckoutProps> = ({
                     onChange={(e) => setSelectedCampus(e.target.value)}
                     className="w-full h-12 px-4 rounded-xl border-2 border-[#3C1A11] bg-transparent text-sm font-bold focus:border-[#2952CC] outline-none cursor-pointer"
                   >
+                    <option value="" disabled className="bg-[#FFF8F0]">
+                      Select your campus
+                    </option>
                     {CAMPUSES.map((campus) => (
                       <option key={campus} value={campus} className="bg-[#FFF8F0]">
                         {campus}
                       </option>
                     ))}
                   </select>
+                  {errors.campus && (
+                    <span className="text-[10px] font-bold text-[#D94F27] block mt-1">{errors.campus}</span>
+                  )}
+
+                  {selectedCampus === "Others" && (
+                    <div className="mt-3">
+                      <input
+                        type="text"
+                        value={otherCampus}
+                        onChange={(e) => setOtherCampus(e.target.value)}
+                        placeholder="Enter your college / campus name"
+                        className="w-full h-12 px-4 rounded-xl border-2 border-[#3C1A11] bg-transparent text-sm font-bold focus:border-[#2952CC] outline-none"
+                      />
+                      {errors.otherCampus && (
+                        <span className="text-[10px] font-bold text-[#D94F27] block mt-1">{errors.otherCampus}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -387,16 +435,59 @@ export const Checkout: React.FC<CheckoutProps> = ({
                   ))}
                 </div>
 
-                <div className="space-y-2 text-xs font-bold text-[#3C1A11]/80">
+                <div className="space-y-2.5 text-xs font-bold text-[#3C1A11]/80">
                   <div className="flex justify-between">
-                    <span>Items Subtotal</span>
+                    <span>Base Price (Items)</span>
                     <span>₹{itemsTotal.toLocaleString("en-IN")}.00</span>
                   </div>
 
-                  {appliedDiscount > 0 && (
-                    <div className="flex justify-between text-[#D94F27] font-bold">
-                      <span>Discount Applied (-)</span>
-                      <span>-₹{appliedDiscount.toLocaleString("en-IN")}.00</span>
+                  {(deliveryFee > 0 || totalCustomFee > 0 || appliedDiscount > 0) && (
+                    <div className="rounded-xl border border-[#3C1A11]/20 bg-[#FFF8F0] overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setShowPriceBreakdown((prev) => !prev)}
+                        className="w-full px-3 py-2.5 flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-[#3C1A11] hover:bg-[#3C1A11]/5 transition-colors cursor-pointer"
+                      >
+                        <span>Additional Charges Details</span>
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          className={`transition-transform duration-200 ${
+                            showPriceBreakdown ? "rotate-180" : ""
+                          }`}
+                        >
+                          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+
+                      {showPriceBreakdown && (
+                        <div className="px-3 pb-3 pt-2 border-t border-[#3C1A11]/10 space-y-1.5 text-[11px] font-bold">
+                          {totalCustomFee > 0 && (
+                            <div className="flex justify-between text-[#3C1A11]">
+                              <span>Unora Studio Custom Print Fee</span>
+                              <span>+₹{totalCustomFee.toLocaleString("en-IN")}.00</span>
+                            </div>
+                          )}
+
+                          {deliveryFee > 0 && (
+                            <div className="flex justify-between text-[#3C1A11]">
+                              <span>Hostel Delivery Charge</span>
+                              <span>+₹{deliveryFee.toLocaleString("en-IN")}.00</span>
+                            </div>
+                          )}
+
+                          {appliedDiscount > 0 && (
+                            <div className="flex justify-between text-[#D94F27]">
+                              <span>Promo / Offer Discount</span>
+                              <span>-₹{appliedDiscount.toLocaleString("en-IN")}.00</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
