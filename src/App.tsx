@@ -3,6 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebaseConfig";
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, deleteDoc, updateDoc, increment } from "firebase/firestore";
 import emailjs from "@emailjs/browser";
+import { Analytics } from "@vercel/analytics/react";
 
 import { Navbar } from "./components/Navbar";
 import { Hero } from "./components/Hero";
@@ -639,7 +640,7 @@ export default function App() {
             setTrackingOrderId(id);
           }}
         />
-
+        
         <TrackingModal
           isOpen={!!trackingOrderId}
           onClose={() => setTrackingOrderId(null)}
@@ -672,6 +673,7 @@ export default function App() {
           ↑
         </button>
       </div>
+      <Analytics />
     </>
   )
 }
