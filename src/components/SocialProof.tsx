@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Icon } from "./Icons";
 
 const REVIEWS = [
@@ -60,6 +60,40 @@ const REVIEWS = [
 
 export const SocialProof: React.FC = () => {
   const [open, setOpen] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const interval = window.setInterval(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: 360, behavior: "smooth" });
+      }
+    }, 3500);
+    return () => window.clearInterval(interval);
+  }, [isPaused]);
+
+  const handleScrollReviews = (direction: "left" | "right") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (direction === "left") {
+      if (el.scrollLeft <= 10) {
+        el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: -360, behavior: "smooth" });
+      }
+    } else {
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: 360, behavior: "smooth" });
+      }
+    }
+  };
 
   const items = [
     [
@@ -91,27 +125,26 @@ export const SocialProof: React.FC = () => {
   return (
     <>
       <style>{`
-        @keyframes unoraReviewsMarquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .reviews-marquee-wrap {
-          overflow: hidden;
-          width: 100%;
-          padding: 8px 0 16px;
-        }
-        .reviews-marquee-track {
+        .reviews-scroll-track {
           display: flex;
           gap: 20px;
-          width: max-content;
-          animation: unoraReviewsMarquee 45s linear infinite;
+          overflow-x: auto;
+          scroll-behavior: smooth;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          padding: 8px 4px 16px;
         }
-        .reviews-marquee-wrap:hover .reviews-marquee-track {
-          animation-play-state: paused;
+        .reviews-scroll-track::-webkit-scrollbar {
+          display: none;
         }
-        .reviews-marquee-track .review-card {
-          width: 340px;
+        .reviews-scroll-track .review-card {
+          width: 320px;
           flex-shrink: 0;
+        }
+        @media (min-width: 640px) {
+          .reviews-scroll-track .review-card {
+            width: 340px;
+          }
         }
       `}</style>
 
@@ -147,27 +180,55 @@ export const SocialProof: React.FC = () => {
             <span className="eyebrow eyebrow--dark">CAMPUS APPROVED</span>
             <h2>THE WORD AROUND HOSTEL</h2>
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleScrollReviews("left")}
+              aria-label="Previous testimonial"
+              className="w-10 h-10 rounded-full border-2 border-[#3C1A11] bg-[#FFF8F0] text-[#3C1A11] hover:bg-[#3C1A11] hover:text-[#BDF119] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScrollReviews("right")}
+              aria-label="Next testimonial"
+              className="w-10 h-10 rounded-full border-2 border-[#3C1A11] bg-[#FFF8F0] text-[#3C1A11] hover:bg-[#3C1A11] hover:text-[#BDF119] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="reviews-marquee-wrap">
-          <div className="reviews-marquee-track">
-            {[...REVIEWS, ...REVIEWS].map((review, idx) => (
-              <div key={`${review.name}-${idx}`} className="review-card">
-                <div className="review-top">
-                  <span>{review.initials}</span>
-                  <div>
-                    <b>{review.name}</b>
-                    <small>{review.meta}</small>
-                  </div>
-                  <em>★★★★★</em>
+        <div
+          ref={scrollRef}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
+          className="reviews-scroll-track"
+        >
+          {REVIEWS.map((review) => (
+            <div key={review.name} className="review-card">
+              <div className="review-top">
+                <span>{review.initials}</span>
+                <div>
+                  <b>{review.name}</b>
+                  <small>{review.meta}</small>
                 </div>
-                <p>“{review.text}”</p>
-                <a href="#verified">
-                  <Icon name="check" size={10} /> Verified campus order
-                </a>
+                <em>★★★★★</em>
               </div>
-            ))}
-          </div>
+              <p>“{review.text}”</p>
+              <a href="#verified">
+                <Icon name="check" size={10} /> Verified campus order
+              </a>
+            </div>
+          ))}
         </div>
       </section>
 

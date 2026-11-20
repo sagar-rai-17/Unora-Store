@@ -445,8 +445,12 @@ export const Catalog: React.FC<CatalogProps> = ({
 
         <div className="sort-wrap">
           <button
+            type="button"
             className="sort button border border-unora-brown/20"
-            onClick={() => setSortOpen(!sortOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSortOpen((prev) => !prev);
+            }}
             aria-expanded={sortOpen}
           >
             {sort}
@@ -454,20 +458,27 @@ export const Catalog: React.FC<CatalogProps> = ({
           </button>
 
           {sortOpen && (
-            <div className="sort-menu">
-              {sortOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => {
-                    setSort(option);
-                    setSortOpen(false);
-                  }}
-                >
-                  <span>{option}</span>
-                  {option === sort && <Icon name="check" size={14} />}
-                </button>
-              ))}
-            </div>
+            <>
+              <div
+                className="fixed inset-0 z-[110] bg-black/30 sm:bg-transparent"
+                onClick={() => setSortOpen(false)}
+              />
+              <div className="sort-menu max-sm:!fixed max-sm:!left-4 max-sm:!right-4 max-sm:!bottom-6 max-sm:!top-auto max-sm:!w-auto max-sm:!z-[120] sm:!z-[120]">
+                {sortOptions.map((option) => (
+                  <button
+                    type="button"
+                    key={option}
+                    onClick={() => {
+                      setSort(option);
+                      setSortOpen(false);
+                    }}
+                  >
+                    <span>{option}</span>
+                    {option === sort && <Icon name="check" size={14} />}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
