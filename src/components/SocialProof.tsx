@@ -1,6 +1,63 @@
 import React, { useState } from "react";
 import { Icon } from "./Icons";
 
+const REVIEWS = [
+  {
+    initials: "LP",
+    name: "Lakshay Panchal",
+    meta: "4th Year · IIT Roorkee",
+    text: "Bhaiii, Unora Studio is crazy! Apna naam daalo aur apni hoodie customise karo? This is actually so cool 😂🔥",
+  },
+  {
+    initials: "PM",
+    name: "Priyanshu Maurya",
+    meta: "4th Year · IIT Roorkee",
+    text: "Bro, the fitting is actually what I liked the most. Oversized fit is on point, fabric is comfortable, and print quality is solid. Multiple washes ke baad bhi colour same hai. W purchase!",
+  },
+  {
+    initials: "HG",
+    name: "Harsh Gupta",
+    meta: "4th Year · IIT Roorkee",
+    text: "Honestly, I was expecting an average college merch T-shirt, but the quality surprised me. The print looks sharp, fabric feels premium, and it doesn't give that cheap merch wala feel.",
+  },
+  {
+    initials: "SG",
+    name: "Sanchita Gupta",
+    meta: "4th Year · IIT Roorkee",
+    text: "Been wearing my UNORA tee for quite a while now, and the quality is genuinely impressive. Fabric still feels great, and the print hasn't lost its charm. Definitely worth it! 🔥",
+  },
+  {
+    initials: "PB",
+    name: "Pratik Bajpayi",
+    meta: "2nd Year · IIT Roorkee",
+    text: "Bhai quality toh ekdum mast hai! Na fabric rough hai, na print wash ke baad kharab hua. Itna sahi merch mil raha hai toh aur kya chahiye 😂",
+  },
+  {
+    initials: "SR",
+    name: "Sagar Rai",
+    meta: "3rd Year · IIT Roorkee",
+    text: "One thing I genuinely appreciate is the attention to detail. The fabric, stitching and print quality are all quite good. Have worn it several times and it still holds its shape really well.",
+  },
+  {
+    initials: "SK",
+    name: "Saksham",
+    meta: "1st Year · IIT Roorkee",
+    text: "Didn't expect the T-shirt to feel this good tbh. It's super comfortable, and the oversized fit looks really nice. Already one of my favourite tees!",
+  },
+  {
+    initials: "KG",
+    name: "Kavya Gururani",
+    meta: "1st Year · IIT Roorkee",
+    text: "Such a nice everyday T-shirt! The material feels really comfortable, the colour looks beautiful, and the print is still intact after washing. Definitely going to order again!",
+  },
+  {
+    initials: "DV",
+    name: "Divya",
+    meta: "1st Year · IIT Roorkee",
+    text: "Yaar, finally some merch that I'd actually want to wear outside college too! The designs look nice, and the customisation feature is such a fun touch. Totally loving the vibe! ✨",
+  },
+];
+
 export const SocialProof: React.FC = () => {
   const [open, setOpen] = useState(0);
 
@@ -33,6 +90,31 @@ export const SocialProof: React.FC = () => {
 
   return (
     <>
+      <style>{`
+        @keyframes unoraReviewsMarquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .reviews-marquee-wrap {
+          overflow: hidden;
+          width: 100%;
+          padding: 8px 0 16px;
+        }
+        .reviews-marquee-track {
+          display: flex;
+          gap: 20px;
+          width: max-content;
+          animation: unoraReviewsMarquee 45s linear infinite;
+        }
+        .reviews-marquee-wrap:hover .reviews-marquee-track {
+          animation-play-state: paused;
+        }
+        .reviews-marquee-track .review-card {
+          width: 340px;
+          flex-shrink: 0;
+        }
+      `}</style>
+
       <section className="story">
         <span className="eyebrow eyebrow--lime">BUILT FOR THE BRIGHTEST</span>
         <h2>
@@ -67,42 +149,25 @@ export const SocialProof: React.FC = () => {
           </div>
         </div>
 
-        <div className="review-grid">
-          {[
-            [
-              "AM",
-              "Ananya Mehta",
-              "IIT Bombay",
-              "The weight and fit feel properly premium. Wore it to Mood Indigo and got asked about it all night.",
-            ],
-            [
-              "RK",
-              "Rishabh Kapoor",
-              "IIT Delhi",
-              "Customization is crisp, not that plasticky print. Delivery came straight to Kumaon hostel.",
-            ],
-            [
-              "SN",
-              "Sneha Nair",
-              "IIT Madras",
-              "Finally campus merch I would wear outside campus too. The oversized tee drapes perfectly.",
-            ],
-          ].map(([initials, name, campus, text]) => (
-            <div key={name} className="review-card">
-              <div className="review-top">
-                <span>{initials}</span>
-                <div>
-                  <b>{name}</b>
-                  <small>{campus}</small>
+        <div className="reviews-marquee-wrap">
+          <div className="reviews-marquee-track">
+            {[...REVIEWS, ...REVIEWS].map((review, idx) => (
+              <div key={`${review.name}-${idx}`} className="review-card">
+                <div className="review-top">
+                  <span>{review.initials}</span>
+                  <div>
+                    <b>{review.name}</b>
+                    <small>{review.meta}</small>
+                  </div>
+                  <em>★★★★★</em>
                 </div>
-                <em>★★★★★</em>
+                <p>“{review.text}”</p>
+                <a href="#verified">
+                  <Icon name="check" size={10} /> Verified campus order
+                </a>
               </div>
-              <p>“{text}”</p>
-              <a href="#verified">
-                <Icon name="check" size={10} /> Verified campus order
-              </a>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 

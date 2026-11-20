@@ -272,10 +272,10 @@ export const UnoraStudio: React.FC<UnoraStudioProps> = ({
               maxLength={25}
               value={text}
               onChange={(e) => {
-                setText(e.target.value.toUpperCase());
+                setText(e.target.value);
                 setIsSelected(true);
               }}
-              placeholder="E.G. SAGAR"
+              placeholder="e.g. Sagar"
               style={{ fontFamily: STUDIO_FONT, fontWeight: 700 }}
               className="w-full p-3 rounded-xl border-2 border-[#3C1A11] bg-[#FFF8F0] text-lg tracking-wider text-[#3C1A11] outline-none resize-none"
             />

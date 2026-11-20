@@ -134,8 +134,8 @@ export const Checkout: React.FC<CheckoutProps> = ({
         createdAt: serverTimestamp(),
       });
 
-      setIsSubmitting(false);
-      setPendingOrder({
+    setIsSubmitting(false);
+    setPendingOrder({
       orderId: generatedOrderId,
       grandTotal,
       hostel: hostelName.trim(),

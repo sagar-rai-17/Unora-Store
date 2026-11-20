@@ -81,8 +81,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
-  const [promoCodeName, setPromoCodeName] = useState("UNORA20");
-  const [isPromoActive, setIsPromoActive] = useState(true);
+  const [coupons, setCoupons] = useState<
+    { id: string; code: string; discountPercent: number; active: boolean }[]
+  >([]);
+  const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponPercent, setNewCouponPercent] = useState("10");
   const [promoSuccess, setPromoSuccess] = useState(false);
 
   const [newProdName, setNewProdName] = useState("");
@@ -236,26 +239,70 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
     const unsubPromo = onSnapshot(doc(db, "settings", "promotions"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        setPromoCodeName(data.code || "UNORA20");
-        setIsPromoActive(data.active !== false);
+        if (Array.isArray(data.coupons)) {
+          setCoupons(data.coupons);
+        } else if (data.code) {
+          setCoupons([
+            {
+              id: "legacy-1",
+              code: String(data.code).toUpperCase(),
+              discountPercent: Number(data.discountPercent || 20),
+              active: data.active !== false,
+            },
+          ]);
+        } else {
+          setCoupons([]);
+        }
+      } else {
+        setCoupons([]);
       }
     });
     return () => unsubPromo();
   }, [isOpen]);
 
-  const handleSavePromo = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveCouponsList = async (
+    nextCoupons: { id: string; code: string; discountPercent: number; active: boolean }[]
+  ) => {
     try {
-      await setDoc(doc(db, "settings", "promotions"), {
-        code: promoCodeName.trim().toUpperCase(),
-        active: isPromoActive,
-        discountPercent: 20,
-      }, { merge: true });
+      await setDoc(doc(db, "settings", "promotions"), { coupons: nextCoupons }, { merge: true });
       setPromoSuccess(true);
       setTimeout(() => setPromoSuccess(false), 2000);
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleAddCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = newCouponCode.trim().toUpperCase();
+    const pct = Math.min(100, Math.max(1, Number(newCouponPercent)));
+    if (!cleanCode || Number.isNaN(pct)) return;
+
+    const filtered = coupons.filter((c) => c.code !== cleanCode);
+    const nextCoupons = [
+      ...filtered,
+      {
+        id: `cpn-${Date.now()}`,
+        code: cleanCode,
+        discountPercent: pct,
+        active: true,
+      },
+    ];
+    await saveCouponsList(nextCoupons);
+    setNewCouponCode("");
+    setNewCouponPercent("10");
+  };
+
+  const handleToggleCoupon = async (id: string) => {
+    const nextCoupons = coupons.map((c) =>
+      c.id === id ? { ...c, active: !c.active } : c
+    );
+    await saveCouponsList(nextCoupons);
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    const nextCoupons = coupons.filter((c) => c.id !== id);
+    await saveCouponsList(nextCoupons);
   };
 
   const handleSeedDatabase = async () => {
@@ -1481,42 +1528,104 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
               </button>
             </form>
 
-            <form onSubmit={handleSavePromo} className="bg-[#FFF8F0] border-2 border-[#3C1A11] p-5 rounded-xl space-y-3">
+            <div className="bg-[#FFF8F0] border-2 border-[#3C1A11] p-5 rounded-xl space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="font-anton text-lg uppercase text-[#3C1A11]">Campus Promo Code Settings (20% Off)</h3>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${isPromoActive ? "bg-[#BDF119] text-[#3C1A11]" : "bg-[#D94F27] text-white"}`}>
-                  {isPromoActive ? "Enabled" : "Disabled"}
-                </span>
+                <div>
+                  <h3 className="font-anton text-lg uppercase text-[#3C1A11]">
+                    Discount Codes Manager (Garment Price Only)
+                  </h3>
+                  <p className="text-[11px] font-semibold text-[#3C1A11]/70">
+                    Discount applies only to garment prices (regular/oversized). Delivery & Studio fees stay unchanged.
+                  </p>
+                </div>
+                {promoSuccess && (
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#BDF119] text-[#3C1A11]">
+                    Saved!
+                  </span>
+                )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              <form onSubmit={handleAddCoupon} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                 <div>
                   <label className="block text-[10px] font-black uppercase mb-1">Coupon Code</label>
                   <input
                     type="text"
-                    value={promoCodeName}
-                    onChange={(e) => setPromoCodeName(e.target.value.toUpperCase())}
+                    required
+                    value={newCouponCode}
+                    onChange={(e) => setNewCouponCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    placeholder="e.g. IITR15"
                     className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold uppercase outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase mb-1">Coupon Availability</label>
-                  <select
-                    value={isPromoActive ? "active" : "inactive"}
-                    onChange={(e) => setIsPromoActive(e.target.value === "active")}
-                    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
-                  >
-                    <option value="active">Active (Usable by students)</option>
-                    <option value="inactive">Disabled (Turned Off)</option>
-                  </select>
+                  <label className="block text-[10px] font-black uppercase mb-1">Discount (%)</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={100}
+                    value={newCouponPercent}
+                    onChange={(e) => setNewCouponPercent(e.target.value)}
+                    placeholder="15"
+                    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
+                  />
                 </div>
-              </div>
-              <button
-                type="submit"
-                className="px-5 h-9 bg-[#3C1A11] text-[#BDF119] hover:bg-[#D94F27] hover:text-[#FFE2C7] font-black text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
-              >
-                {promoSuccess ? "SAVED TO SYSTEM!" : "SAVE PROMO CONFIG"}
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="h-10 px-5 bg-[#3C1A11] text-[#BDF119] hover:bg-[#D94F27] hover:text-[#FFE2C7] font-black text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                >
+                  + Add Discount Code
+                </button>
+              </form>
+
+              {coupons.length === 0 ? (
+                <p className="text-xs font-bold text-[#3C1A11]/50">No discount codes created yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {coupons.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex flex-wrap items-center justify-between gap-2 bg-white border border-[#3C1A11]/20 rounded-xl px-3.5 py-2.5"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono font-black text-xs text-[#3C1A11]">{c.code}</span>
+                        <span className="px-2 py-0.5 rounded bg-[#D94F27]/15 text-[#D94F27] text-[10px] font-black uppercase">
+                          {c.discountPercent}% OFF
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            c.active ? "bg-[#BDF119] text-[#3C1A11]" : "bg-[#3C1A11]/10 text-[#3C1A11]/50"
+                          }`}
+                        >
+                          {c.active ? "Active" : "Off"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCoupon(c.id)}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer transition-all ${
+                            c.active
+                              ? "bg-[#3C1A11]/10 text-[#3C1A11] hover:bg-[#3C1A11] hover:text-white"
+                              : "bg-[#3C1A11] text-[#BDF119]"
+                          }`}
+                        >
+                          {c.active ? "Turn Off" : "Turn On"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCoupon(c.id)}
+                          className="px-3 py-1 rounded-lg bg-[#D94F27]/15 text-[#D94F27] hover:bg-[#D94F27] hover:text-white text-[10px] font-black uppercase cursor-pointer transition-all"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div>
               <span className="text-[10px] font-black uppercase text-[#D94F27] tracking-widest">Live Inventory</span>
