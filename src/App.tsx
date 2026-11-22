@@ -78,22 +78,32 @@ export default function App() {
         ...d.data(),
       })) as Product[];
 
-      if (liveProducts.length > 0) {
-        setInventoryProducts(liveProducts);
-      }
+      setInventoryProducts(liveProducts);
 
       const livePriceMap: Record<string, number> = {};
       liveProducts.forEach((p) => {
         livePriceMap[p.name] = p.price;
       });
 
+      const visibleProducts = liveProducts.filter(
+        (p) => p.isHidden !== true && p.inStock !== false
+      );
+
       setCartItems((prevItems) =>
-        prevItems.map((item) => {
-          if (livePriceMap[item.name] && livePriceMap[item.name] !== item.basePrice) {
-            return { ...item, basePrice: livePriceMap[item.name] };
-          }
-          return item;
-        })
+        prevItems
+          .filter((item) =>
+            visibleProducts.some(
+              (p) =>
+                item.id.toString().startsWith(`${p.id}-`) ||
+                item.name.startsWith(p.name)
+            )
+          )
+          .map((item) => {
+            if (livePriceMap[item.name] && livePriceMap[item.name] !== item.basePrice) {
+              return { ...item, basePrice: livePriceMap[item.name] };
+            }
+            return item;
+          })
       );
     });
 
@@ -103,10 +113,11 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedId = params.get("id");
-    if (!sharedId) return;
+    if (!sharedId || inventoryProducts.length === 0) return;
 
-    const allProducts = inventoryProducts.length > 0 ? inventoryProducts : products;
-    const match = allProducts.find((p) => p.id === sharedId);
+    const match = inventoryProducts.find(
+      (p) => p.id === sharedId && p.isHidden !== true
+    );
     if (match) {
       setSelectedDetailProduct(match);
     }
@@ -590,7 +601,7 @@ export default function App() {
           isOpen={isWishlistOpen}
           onClose={() => setIsWishlistOpen(false)}
           wishlistIds={wishlistItems}
-          products={products}
+          products={inventoryProducts.filter((p) => p.isHidden !== true)}
           onMoveToBag={(product, size) => handleAddCatalogProduct(product, size)}
           onRemoveFromWishlist={(id) => handleToggleWishlist(id)}
         />

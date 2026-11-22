@@ -306,7 +306,7 @@ export const Catalog: React.FC<CatalogProps> = ({
   const [sort, setSort] = useState("Trending");
   const [sortOpen, setSortOpen] = useState(false);
 
-  const activeProducts = liveProducts.length > 0 ? liveProducts : products;
+  const activeProducts = liveProducts;
 
   const sortOptions = [
     "Trending",

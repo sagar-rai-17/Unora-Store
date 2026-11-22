@@ -54,6 +54,12 @@ export const Checkout: React.FC<CheckoutProps> = ({
     campus: string;
   } | null>(null);
 
+  React.useEffect(() => {
+    if (pendingOrder && items.length === 0) {
+      setPendingOrder(null);
+    }
+  }, [items.length, pendingOrder]);
+
   useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 

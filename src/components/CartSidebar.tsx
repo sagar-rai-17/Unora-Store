@@ -290,12 +290,6 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         <div className="p-5 bg-[#FFF8F0] border-t border-[#3C1A11]/15 space-y-3">
           {items.length > 0 && (
             <div className="space-y-2 pb-2 border-b border-[#3C1A11]/10">
-              {totalQuantity >= 5 && (
-                <div className="flex items-center justify-between bg-[#3C1A11] text-[#BDF119] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                  <span>BUY 4 GET 1 FREE APPLIED</span>
-                  <span>-₹{autoOfferDiscount.toLocaleString("en-IN")}</span>
-                </div>
-              )}
 
               {activeCoupon ? (
                 <div className="flex items-center justify-between bg-[#3C1A11]/5 border border-[#3C1A11]/20 px-3 py-1.5 rounded-lg">
