@@ -352,7 +352,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               {detailsOpen && (
                 <div className="p-4 pt-0 text-xs font-semibold space-y-2 border-t border-[#3C1A11]/10 text-[#3C1A11]/80">
                   <p>
-                    <strong>Material & Care:</strong> 100% Cotton, Heavyweight 240 GSM. Machine wash cold, dry flat in shade.
+                    <strong>Material & Care:</strong> 100% Cotton, Hoodies are of 350 GSM and T-Shirts are of 200 GSM. Machine wash cold, dry flat in shade.
                   </p>
                   <p>
                     <strong>Country of Origin:</strong> India
