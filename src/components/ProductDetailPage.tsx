@@ -289,8 +289,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 onClick={() => onLaunchStudio(product)}
                 className="px-4 h-10 bg-[#3C1A11] hover:bg-[#2952CC] text-[#BDF119] font-black uppercase text-[10px] tracking-wider rounded-xl transition-all shrink-0 cursor-pointer"
               >
-                STUDIO
-                <br></br><span>Not Available Currently</span>
+                OPEN STUDIO
               </button>
             </div>
 

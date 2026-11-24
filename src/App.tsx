@@ -609,14 +609,12 @@ export default function App() {
           onAddToCart={handleAddToCartFromDetail}
           onToggleWishlist={handleToggleWishlist}
           isWishlisted={selectedDetailProduct ? wishlistItems.includes(selectedDetailProduct.id) : false}
-          onLaunchStudio={() => {
-  setToastMessage("Unora Studio is temporarily closed. Coming back soon!");
-  setToast(true);
-  window.setTimeout(() => setToast(false), 2500);
+          onLaunchStudio={(prod) => {
+  setStudioProduct(prod);
 }}
         />
 
-        {/* <UnoraStudio
+        <UnoraStudio
           isOpen={!!studioProduct}
           onClose={() => setStudioProduct(null)}
           baseProduct={studioProduct}
@@ -636,7 +634,7 @@ export default function App() {
             });
             setStudioProduct(null);
           }}
-        /> */}
+        />
         {showReels && <Reels />}
         <SocialProof />
         <Footer
