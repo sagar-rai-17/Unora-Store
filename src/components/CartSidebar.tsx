@@ -18,12 +18,63 @@ export interface CartItem {
   studioDesign?: any;
 }
 
+export interface CouponOffer {
+  code: string;
+  title: string;
+  subtitle: string;
+  type: "percent" | "buy_x_get_1";
+  discountPercent?: number;
+  minAmount?: number;
+  buyQty?: number;
+  firstPurchaseOnly?: boolean;
+  active?: boolean;
+}
+
+const DEFAULT_COUPONS: CouponOffer[] = [
+  {
+    code: "FIRST",
+    title: "5% OFF",
+    subtitle: "On your first purchase",
+    type: "percent",
+    discountPercent: 5,
+    firstPurchaseOnly: true,
+    active: true,
+  },
+  {
+    code: "UNO10",
+    title: "10% OFF",
+    subtitle: "On shopping above ₹1,500",
+    type: "percent",
+    discountPercent: 10,
+    minAmount: 1500,
+    active: true,
+  },
+  {
+    code: "UNO15",
+    title: "15% OFF",
+    subtitle: "On shopping above ₹2,000",
+    type: "percent",
+    discountPercent: 15,
+    minAmount: 2000,
+    active: true,
+  },
+  {
+    code: "B4G1",
+    title: "BUY 4 GET 1 FREE",
+    subtitle: "Lowest priced item free",
+    type: "buy_x_get_1",
+    buyQty: 4,
+    active: true,
+  },
+];
+
 interface CartSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
   activeCoupon: string | null;
   appliedDiscount: number;
+  isFirstPurchase?: boolean;
   onApplyDiscount: (amount: number, code: string | null) => void;
   onUpdateQuantity: (id: string | number, delta: number) => void;
   onRemoveItem: (id: string | number) => void;
@@ -36,6 +87,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
   items,
   activeCoupon,
   appliedDiscount,
+  isFirstPurchase = true,
   onApplyDiscount,
   onUpdateQuantity,
   onRemoveItem,
@@ -43,6 +95,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 }) => {
   const [couponInput, setCouponInput] = React.useState("");
   const [couponError, setCouponError] = React.useState<string | null>(null);
+  const [systemCoupons, setSystemCoupons] = React.useState<CouponOffer[]>([]);
 
   const subtotal = items.reduce((acc, item) => {
     return acc + item.basePrice * item.quantity;
@@ -52,37 +105,39 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
     return acc + (item.customFee || 0) * item.quantity;
   }, 0);
 
+  const totalQuantity = items.reduce((acc, item) => acc + item.quantity, 0);
 
- 
-
-  const [systemCoupons, setSystemCoupons] = React.useState<
-    { id: string; code: string; discountPercent: number; active: boolean }[]
-  >([]);
-  const [buy4get1Active, setBuy4get1Active] = React.useState<boolean>(false);
+  const cheapestUnitPrice =
+    items.length > 0 ? Math.min(...items.map((item) => item.basePrice)) : 0;
 
   React.useEffect(() => {
-    const unsubOffers = onSnapshot(doc(db, "settings", "offers"), (snap) => {
-      if (snap.exists()) {
-        setBuy4get1Active(snap.data().buy4get1Enabled === true);
-      } else {
-        setBuy4get1Active(false);
-      }
-    });
-
     const unsubPromo = onSnapshot(doc(db, "settings", "promotions"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data.coupons)) {
-          setSystemCoupons(data.coupons);
-        } else if (data.code) {
-          setSystemCoupons([
-            {
-              id: "legacy-1",
-              code: String(data.code).toUpperCase(),
-              discountPercent: Number(data.discountPercent || 20),
-              active: data.active !== false,
-            },
-          ]);
+          const mapped: CouponOffer[] = data.coupons
+            .filter((c: any) => c.active !== false)
+            .map((c: any) => ({
+              code: String(c.code).toUpperCase(),
+              title:
+                c.type === "buy_x_get_1"
+                  ? `BUY ${c.buyQty || 4} GET 1 FREE`
+                  : `${Number(c.discountPercent || 0)}% OFF`,
+              subtitle:
+                c.subtitle ||
+                (c.type === "buy_x_get_1"
+                  ? "Lowest priced item free"
+                  : c.minAmount
+                  ? `On shopping above ₹${Number(c.minAmount).toLocaleString("en-IN")}`
+                  : "Applicable on garment subtotal"),
+              type: c.type === "buy_x_get_1" ? "buy_x_get_1" : "percent",
+              discountPercent: Number(c.discountPercent || 0),
+              minAmount: c.minAmount ? Number(c.minAmount) : undefined,
+              buyQty: c.buyQty ? Number(c.buyQty) : undefined,
+              firstPurchaseOnly: c.firstPurchaseOnly === true,
+              active: true,
+            }));
+          setSystemCoupons(mapped);
         } else {
           setSystemCoupons([]);
         }
@@ -91,67 +146,141 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       }
     });
 
-    return () => {
-      unsubOffers();
-      unsubPromo();
-    };
+    return () => unsubPromo();
   }, []);
 
-  const totalQuantity = items.reduce((acc, item) => acc + item.quantity, 0);
+  const allCoupons = React.useMemo(() => {
+    const map = new Map<string, CouponOffer>();
+    DEFAULT_COUPONS.forEach((c) => {
+      if (c.active !== false) map.set(c.code, c);
+    });
+    systemCoupons.forEach((c) => {
+      if (c.active !== false) map.set(c.code, c);
+    });
+    return Array.from(map.values());
+  }, [systemCoupons]);
 
-  const cheapestUnitPrice = items.length > 0
-    ? Math.min(...items.map((item) => item.basePrice))
-    : 0;
+  const evaluateCoupon = React.useCallback(
+    (offer: CouponOffer) => {
+      if (offer.firstPurchaseOnly && !isFirstPurchase) {
+        return {
+          eligible: false,
+          discount: 0,
+          message: "Valid only on your first purchase.",
+        };
+      }
 
-  const autoOfferDiscount = buy4get1Active && totalQuantity >= 5 ? cheapestUnitPrice : 0;
+      if (offer.minAmount && subtotal < offer.minAmount) {
+        const remaining = offer.minAmount - subtotal;
+        return {
+          eligible: false,
+          discount: 0,
+          message: `Shop for ₹${remaining.toLocaleString("en-IN")} more to avail this discount.`,
+        };
+      }
+
+      if (offer.type === "buy_x_get_1") {
+        const requiredQty = (offer.buyQty || 4) + 1;
+        if (totalQuantity < requiredQty) {
+          const needed = requiredQty - totalQuantity;
+          return {
+            eligible: false,
+            discount: 0,
+            message: `Add ${needed} more item${needed > 1 ? "s" : ""} to unlock Buy ${offer.buyQty || 4} Get 1 Free.`,
+          };
+        }
+        return {
+          eligible: true,
+          discount: cheapestUnitPrice,
+          message: "",
+        };
+      }
+
+      const pct = offer.discountPercent || 0;
+      return {
+        eligible: true,
+        discount: Math.round(subtotal * (pct / 100)),
+        message: "",
+      };
+    },
+    [subtotal, totalQuantity, cheapestUnitPrice, isFirstPurchase]
+  );
 
   const matchedActiveCoupon = activeCoupon
-    ? systemCoupons.find((c) => c.code === activeCoupon && c.active)
+    ? allCoupons.find((c) => c.code === activeCoupon) || null
     : null;
 
   React.useEffect(() => {
-    if (items.length === 0) return;
-    if (activeCoupon) {
-      if (!matchedActiveCoupon) {
-        onApplyDiscount(autoOfferDiscount, null);
-        return;
+    if (items.length === 0) {
+      if (appliedDiscount !== 0 || activeCoupon !== null) {
+        onApplyDiscount(0, null);
       }
-      const garmentDiscount = Math.round(
-        Math.max(0, subtotal - autoOfferDiscount) * (matchedActiveCoupon.discountPercent / 100)
-      );
-      const nextTotalDiscount = garmentDiscount + autoOfferDiscount;
-      if (nextTotalDiscount !== appliedDiscount) {
-        onApplyDiscount(nextTotalDiscount, matchedActiveCoupon.code);
-      }
-    } else if (autoOfferDiscount !== appliedDiscount) {
-      onApplyDiscount(autoOfferDiscount, null);
+      return;
     }
-  }, [subtotal, autoOfferDiscount, activeCoupon, matchedActiveCoupon, items.length]);
+
+    if (!activeCoupon) {
+      if (appliedDiscount !== 0) {
+        onApplyDiscount(0, null);
+      }
+      return;
+    }
+
+    if (!matchedActiveCoupon) {
+      onApplyDiscount(0, null);
+      return;
+    }
+
+    const result = evaluateCoupon(matchedActiveCoupon);
+    if (!result.eligible) {
+      onApplyDiscount(0, null);
+      setCouponError(result.message);
+    } else if (result.discount !== appliedDiscount) {
+      onApplyDiscount(result.discount, matchedActiveCoupon.code);
+    }
+  }, [
+    subtotal,
+    totalQuantity,
+    cheapestUnitPrice,
+    activeCoupon,
+    matchedActiveCoupon,
+    items.length,
+    appliedDiscount,
+    evaluateCoupon,
+    onApplyDiscount,
+  ]);
 
   const finalTotal = Math.max(0, subtotal - appliedDiscount) + totalCustomizationFee;
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCode = couponInput.trim().toUpperCase();
-    const matched = systemCoupons.find((c) => c.code === cleanCode && c.active);
+  const tryApplyCode = (rawCode: string) => {
+    const cleanCode = rawCode.trim().toUpperCase();
+    const matched = allCoupons.find((c) => c.code === cleanCode);
 
     if (!matched) {
       setCouponError("Invalid or inactive discount code.");
       return;
     }
 
-    const garmentDiscount = Math.round(
-      Math.max(0, subtotal - autoOfferDiscount) * (matched.discountPercent / 100)
-    );
-    onApplyDiscount(garmentDiscount + autoOfferDiscount, matched.code);
+    const result = evaluateCoupon(matched);
+    if (!result.eligible) {
+      setCouponError(result.message);
+      return;
+    }
+
+    onApplyDiscount(result.discount, matched.code);
     setCouponError(null);
     setCouponInput("");
   };
 
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    tryApplyCode(couponInput);
+  };
+
   const handleRemoveCoupon = () => {
-    onApplyDiscount(autoOfferDiscount, null);
+    onApplyDiscount(0, null);
     setCouponError(null);
   };
+
   useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
@@ -170,7 +299,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
               YOUR BAG
             </h2>
             <span className="text-xs font-black bg-[#3C1A11] text-[#BDF119] px-2 py-0.5 rounded-full">
-              {items.reduce((acc, item) => acc + item.quantity, 0)}
+              {totalQuantity}
             </span>
           </div>
 
@@ -185,13 +314,6 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
             </svg>
           </button>
         </div>
-
-        {buy4get1Active && totalQuantity >= 5 && (
-                <div className="flex items-center justify-between bg-[#3C1A11] text-[#BDF119] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                  <span>BUY 4 GET 1 FREE APPLIED</span>
-                  <span>-₹{autoOfferDiscount.toLocaleString("en-IN")}.00</span>
-                </div>
-              )}
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {items.length === 0 ? (
@@ -290,11 +412,69 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         <div className="p-5 bg-[#FFF8F0] border-t border-[#3C1A11]/15 space-y-3">
           {items.length > 0 && (
             <div className="space-y-2 pb-2 border-b border-[#3C1A11]/10">
+              <div className="space-y-1.5">
+                <span className="block text-[10px] font-black uppercase tracking-widest text-[#3C1A11]/60">
+                  Available Offers (1 Coupon Per Order)
+                </span>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {allCoupons.map((offer) => {
+                    const status = evaluateCoupon(offer);
+                    const isApplied = activeCoupon === offer.code;
+                    return (
+                      <button
+                        key={offer.code}
+                        type="button"
+                        onClick={() => {
+                          if (isApplied) {
+                            handleRemoveCoupon();
+                          } else {
+                            tryApplyCode(offer.code);
+                          }
+                        }}
+                        className={`shrink-0 w-44 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isApplied
+                            ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+                            : status.eligible
+                            ? "bg-white border-[#3C1A11]/40 hover:border-[#D94F27] text-[#3C1A11]"
+                            : "bg-white/60 border-dashed border-[#3C1A11]/25 text-[#3C1A11]/70 hover:border-[#3C1A11]/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-mono text-[10px] font-black uppercase tracking-wider">
+                            {offer.code}
+                          </span>
+                          <span
+                            className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              isApplied
+                                ? "bg-[#BDF119] text-[#3C1A11]"
+                                : status.eligible
+                                ? "bg-[#D94F27]/15 text-[#D94F27]"
+                                : "bg-[#3C1A11]/10 text-[#3C1A11]/60"
+                            }`}
+                          >
+                            {isApplied ? "APPLIED" : status.eligible ? "APPLY" : "LOCKED"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-black uppercase mt-1 leading-tight">
+                          {offer.title}
+                        </p>
+                        <p
+                          className={`text-[9px] font-semibold mt-0.5 leading-snug ${
+                            isApplied ? "text-[#FFE2C7]/85" : "text-[#3C1A11]/65"
+                          }`}
+                        >
+                          {offer.subtitle}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {activeCoupon ? (
                 <div className="flex items-center justify-between bg-[#3C1A11]/5 border border-[#3C1A11]/20 px-3 py-1.5 rounded-lg">
                   <span className="text-[10px] font-black text-[#D94F27] uppercase tracking-wider">
-                    COUPON: {activeCoupon} ({matchedActiveCoupon?.discountPercent ?? 0}% OFF)
+                    COUPON: {activeCoupon} ({matchedActiveCoupon?.title || "APPLIED"})
                   </span>
                   <button
                     type="button"

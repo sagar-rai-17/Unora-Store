@@ -63,6 +63,7 @@ export interface AdminOrder {
   createdAt?: any;
   deliveryType?: "campus" | "other";
   fullAddress?: string;
+  isDeleted?: boolean;
 }
 
 interface AdminPortalProps {
@@ -84,10 +85,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [coupons, setCoupons] = useState<
-    { id: string; code: string; discountPercent: number; active: boolean }[]
+    {
+      id: string;
+      code: string;
+      type?: "percent" | "buy_x_get_1";
+      discountPercent?: number;
+      minAmount?: number;
+      buyQty?: number;
+      firstPurchaseOnly?: boolean;
+      active: boolean;
+    }[]
   >([]);
   const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponType, setNewCouponType] = useState<"percent" | "buy_x_get_1">("percent");
   const [newCouponPercent, setNewCouponPercent] = useState("10");
+  const [newCouponMinAmount, setNewCouponMinAmount] = useState("");
+  const [newCouponBuyQty, setNewCouponBuyQty] = useState("4");
+  const [newCouponFirstOnly, setNewCouponFirstOnly] = useState(false);
   const [promoSuccess, setPromoSuccess] = useState(false);
 
   const [newProdName, setNewProdName] = useState("");
@@ -262,9 +276,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
     return () => unsubPromo();
   }, [isOpen]);
 
-  const saveCouponsList = async (
-    nextCoupons: { id: string; code: string; discountPercent: number; active: boolean }[]
-  ) => {
+  const saveCouponsList = async (nextCoupons: typeof coupons) => {
     try {
       await setDoc(doc(db, "settings", "promotions"), { coupons: nextCoupons }, { merge: true });
       setPromoSuccess(true);
@@ -277,24 +289,42 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = newCouponCode.trim().toUpperCase();
-    const pct = Math.min(100, Math.max(1, Number(newCouponPercent)));
-    if (!cleanCode || Number.isNaN(pct)) return;
+    if (!cleanCode) return;
 
+    const minAmt = newCouponMinAmount.trim() ? Math.max(0, Number(newCouponMinAmount)) : 0;
     const filtered = coupons.filter((c) => c.code !== cleanCode);
-    const nextCoupons = [
-      ...filtered,
-      {
-        id: `cpn-${Date.now()}`,
-        code: cleanCode,
-        discountPercent: pct,
-        active: true,
-      },
-    ];
-    await saveCouponsList(nextCoupons);
+
+    const newEntry =
+      newCouponType === "buy_x_get_1"
+        ? {
+            id: `cpn-${Date.now()}`,
+            code: cleanCode,
+            type: "buy_x_get_1" as const,
+            buyQty: Math.max(1, Number(newCouponBuyQty) || 4),
+            ...(minAmt > 0 ? { minAmount: minAmt } : {}),
+            firstPurchaseOnly: newCouponFirstOnly,
+            active: true,
+          }
+        : {
+            id: `cpn-${Date.now()}`,
+            code: cleanCode,
+            type: "percent" as const,
+            discountPercent: Math.min(100, Math.max(1, Number(newCouponPercent) || 10)),
+            ...(minAmt > 0 ? { minAmount: minAmt } : {}),
+            firstPurchaseOnly: newCouponFirstOnly,
+            active: true,
+          };
+
+    await saveCouponsList([...filtered, newEntry]);
     setNewCouponCode("");
+    setNewCouponType("percent");
     setNewCouponPercent("10");
+    setNewCouponMinAmount("");
+    setNewCouponBuyQty("4");
+    setNewCouponFirstOnly(false);
   };
 
+  
   const handleToggleCoupon = async (id: string) => {
     const nextCoupons = coupons.map((c) =>
       c.id === id ? { ...c, active: !c.active } : c
@@ -452,6 +482,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
             paymentFeedback: data.paymentFeedback || "",
             deliveryType: data.deliveryType || "campus",
             fullAddress: data.fullAddress || "",
+            isDeleted: data.isDeleted === true,
           };
         });
         setOrders(fetched);
@@ -621,20 +652,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   }, [orders]);
 
   const metrics = useMemo(() => {
-    const totalOrders = validOrders.length;
-    const totalRevenue = validOrders
+    const activeOrders = validOrders.filter((order) => !order.isDeleted);
+
+    const totalOrders = activeOrders.filter(
+      (order) => order.paymentStatus === "verified"
+    ).length;
+
+    const totalRevenue = activeOrders
       .filter(
         (order) =>
           order.paymentStatus === "verified" &&
           (order.status === "In Transit" || order.status === "Delivered")
       )
       .reduce((acc, order) => acc + order.grandTotal, 0);
-    const customItemsCount = validOrders.reduce((acc, order) => {
-      const customsInOrder = order.items.reduce((itemAcc, item) => {
-        return itemAcc + (item.customText && item.customText.trim() !== "" ? item.quantity : 0);
+
+    const customItemsCount = activeOrders
+      .filter(
+        (order) =>
+          order.paymentStatus === "verified" && order.status === "In Transit"
+      )
+      .reduce((acc, order) => {
+        const customsInOrder = order.items.reduce((itemAcc, item) => {
+          return itemAcc + (item.customText && item.customText.trim() !== "" ? item.quantity : 0);
+        }, 0);
+        return acc + customsInOrder;
       }, 0);
-      return acc + customsInOrder;
-    }, 0);
 
     return { totalOrders, totalRevenue, customItemsCount };
   }, [validOrders]);
@@ -1573,7 +1615,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                 )}
               </div>
 
-              <form onSubmit={handleAddCoupon} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <form onSubmit={handleAddCoupon} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
                 <div>
                   <label className="block text-[10px] font-black uppercase mb-1">Coupon Code</label>
                   <input
@@ -1581,28 +1623,79 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                     required
                     value={newCouponCode}
                     onChange={(e) => setNewCouponCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                    placeholder="e.g. IITR15"
+                    placeholder="e.g. UNO15"
                     className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold uppercase outline-none"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-[10px] font-black uppercase mb-1">Discount (%)</label>
+                  <label className="block text-[10px] font-black uppercase mb-1">Offer Type</label>
+                  <select
+                    value={newCouponType}
+                    onChange={(e) => setNewCouponType(e.target.value as "percent" | "buy_x_get_1")}
+                    className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none cursor-pointer"
+                  >
+                    <option value="percent">% Off</option>
+                    <option value="buy_x_get_1">Buy X Get 1 Free</option>
+                  </select>
+                </div>
+
+                {newCouponType === "percent" ? (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase mb-1">Discount (%)</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={100}
+                      value={newCouponPercent}
+                      onChange={(e) => setNewCouponPercent(e.target.value)}
+                      placeholder="15"
+                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase mb-1">Buy Qty (X)</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={newCouponBuyQty}
+                      onChange={(e) => setNewCouponBuyQty(e.target.value)}
+                      placeholder="4"
+                      className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase mb-1">Min Cart ₹ (Opt.)</label>
                   <input
                     type="number"
-                    required
-                    min={1}
-                    max={100}
-                    value={newCouponPercent}
-                    onChange={(e) => setNewCouponPercent(e.target.value)}
-                    placeholder="15"
+                    min={0}
+                    value={newCouponMinAmount}
+                    onChange={(e) => setNewCouponMinAmount(e.target.value)}
+                    placeholder="e.g. 1500"
                     className="w-full h-10 px-3 rounded-lg border border-[#3C1A11] bg-white text-xs font-bold outline-none"
                   />
                 </div>
+
+                <label className="h-10 px-3 rounded-lg border border-[#3C1A11]/40 bg-white flex items-center gap-2 text-[10px] font-black uppercase cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newCouponFirstOnly}
+                    onChange={(e) => setNewCouponFirstOnly(e.target.checked)}
+                    className="accent-[#3C1A11]"
+                  />
+                  <span>1st Order Only</span>
+                </label>
+
                 <button
                   type="submit"
-                  className="h-10 px-5 bg-[#3C1A11] text-[#BDF119] hover:bg-[#D94F27] hover:text-[#FFE2C7] font-black text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                  className="h-10 px-4 bg-[#3C1A11] text-[#BDF119] hover:bg-[#D94F27] hover:text-[#FFE2C7] font-black text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
                 >
-                  + Add Discount Code
+                  + Save Code
                 </button>
               </form>
 
@@ -1615,11 +1708,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                       key={c.id}
                       className="flex flex-wrap items-center justify-between gap-2 bg-white border border-[#3C1A11]/20 rounded-xl px-3.5 py-2.5"
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono font-black text-xs text-[#3C1A11]">{c.code}</span>
                         <span className="px-2 py-0.5 rounded bg-[#D94F27]/15 text-[#D94F27] text-[10px] font-black uppercase">
-                          {c.discountPercent}% OFF
+                          {c.type === "buy_x_get_1"
+                            ? `BUY ${c.buyQty || 4} GET 1 FREE`
+                            : `${c.discountPercent || 0}% OFF`}
                         </span>
+                        {c.minAmount && c.minAmount > 0 && (
+                          <span className="px-2 py-0.5 rounded bg-[#3C1A11]/10 text-[#3C1A11] text-[10px] font-black uppercase">
+                            Min ₹{c.minAmount.toLocaleString("en-IN")}
+                          </span>
+                        )}
+                        {c.firstPurchaseOnly && (
+                          <span className="px-2 py-0.5 rounded bg-[#2952CC]/15 text-[#2952CC] text-[10px] font-black uppercase">
+                            1st Order
+                          </span>
+                        )}
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                             c.active ? "bg-[#BDF119] text-[#3C1A11]" : "bg-[#3C1A11]/10 text-[#3C1A11]/50"
