@@ -69,12 +69,6 @@ export const Checkout: React.FC<CheckoutProps> = ({
     }
   });
 
-  React.useEffect(() => {
-    if (pendingOrder && items.length === 0) {
-      setPendingOrder(null);
-    }
-  }, [items.length, pendingOrder]);
-
   useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 

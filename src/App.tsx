@@ -27,21 +27,22 @@ import { ProductDetailPage } from "./components/ProductDetailPage";
 import { StaticInfoModal, type StaticInfoType } from "./components/StaticInfoModal";
 import { AboutUsModal } from "./components/AboutUsModal";
 import { FeedbackModal } from "./components/FeedbackModal";
-import { useHistoryOverlay} from "./hooks/useHistoryOverlay";
+import { useHistoryOverlay } from "./hooks/useHistoryOverlay";
+
 const getSessionFlag = (key: string) => sessionStorage.getItem(key) === "true";
 
 export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem("unora_cart")
+    const saved = localStorage.getItem("unora_cart");
     if (saved) {
       try {
-        return JSON.parse(saved)
+        return JSON.parse(saved);
       } catch {
-        return []
+        return [];
       }
     }
-    return []
-  })
+    return [];
+  });
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>("");
@@ -68,15 +69,15 @@ export default function App() {
   const [showReels, setShowReels] = useState(false);
 
   useEffect(() => {
-  const unsubReelsSetting = onSnapshot(doc(db, "settings", "reels"), (snap) => {
-    if (snap.exists()) {
-      setShowReels(snap.data().showReels === true);
-    } else {
-      setShowReels(false);
-    }
-  });
-  return () => unsubReelsSetting();
-}, []);
+    const unsubReelsSetting = onSnapshot(doc(db, "settings", "reels"), (snap) => {
+      if (snap.exists()) {
+        setShowReels(snap.data().showReels === true);
+      } else {
+        setShowReels(false);
+      }
+    });
+    return () => unsubReelsSetting();
+  }, []);
 
   useEffect(() => {
     const unsubInv = onSnapshot(collection(db, "inventory"), (snap) => {
@@ -86,6 +87,8 @@ export default function App() {
       })) as Product[];
 
       setInventoryProducts(liveProducts);
+
+      if (liveProducts.length === 0) return;
 
       const livePriceMap: Record<string, number> = {};
       liveProducts.forEach((p) => {
@@ -98,12 +101,14 @@ export default function App() {
 
       setCartItems((prevItems) =>
         prevItems
-          .filter((item) =>
-            visibleProducts.some(
-              (p) =>
-                item.id.toString().startsWith(`${p.id}-`) ||
-                item.name.startsWith(p.name)
-            )
+          .filter(
+            (item) =>
+              item.id.toString().startsWith("studio-") ||
+              visibleProducts.some(
+                (p) =>
+                  item.id.toString().startsWith(`${p.id}-`) ||
+                  item.name.startsWith(p.name)
+              )
           )
           .map((item) => {
             if (livePriceMap[item.name] && livePriceMap[item.name] !== item.basePrice) {
@@ -116,7 +121,6 @@ export default function App() {
 
     return () => unsubInv();
   }, []);
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedId = params.get("id");
@@ -140,20 +144,22 @@ export default function App() {
       ).catch((err) => console.error(err));
     }
   }, [cartItems]);
-  const [isOrderSuccessOpen, setIsOrderSuccessOpen] = useState(false)
-  const [orderDetails, setOrderDetails] = useState({ id: "", hostel: "", campus: "" })
+
+  const [isOrderSuccessOpen, setIsOrderSuccessOpen] = useState(false);
+  const [orderDetails, setOrderDetails] = useState({ id: "", hostel: "", campus: "" });
   const [loading, setLoading] = useState(
     () => sessionStorage.getItem("unora_preloader_done") !== "true"
   );
-  const [toast, setToast] = useState(false)
-  const [toastMessage, setToastMessage] = useState("Added to your bag")
-  const [isAuthOpen, setIsAuthOpen] = useState(false)
+  const [toast, setToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("Added to your bag");
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(() => getSessionFlag("unora_open_cart"));
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(() => getSessionFlag("unora_open_checkout"));
   const [isAccountOpen, setIsAccountOpen] = useState(() => getSessionFlag("unora_open_account"));
   const [isAdminOpen, setIsAdminOpen] = useState(() => getSessionFlag("unora_open_admin"));
   const [isWishlistOpen, setIsWishlistOpen] = useState(() => getSessionFlag("unora_open_wishlist"));
   const [isAdmin, setIsAdmin] = useState(false);
+
   const closeDetailProduct = useCallback(() => {
     setSelectedDetailProduct(null);
     if (window.location.search) {
@@ -223,8 +229,18 @@ export default function App() {
 
   useEffect(() => {
     let unsubscribeOrders: (() => void) | null = null;
+    let unsubscribeWishlist: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubscribeOrders) {
+        unsubscribeOrders();
+        unsubscribeOrders = null;
+      }
+      if (unsubscribeWishlist) {
+        unsubscribeWishlist();
+        unsubscribeWishlist = null;
+      }
+
       if (user) {
         setIsLoggedIn(true);
         setUserEmail(user.email || "");
@@ -247,7 +263,7 @@ export default function App() {
               localStorage.removeItem("unora_cart");
             }
           }
-          
+
           if (!finalName) {
             finalName = user.displayName || (user.email ? user.email.split("@")[0] : "") || "Campus Member";
           }
@@ -259,24 +275,36 @@ export default function App() {
         }
 
         const wishlistQuery = collection(db, "users", user.uid, "wishlist");
-        const unsubscribeWishlist = onSnapshot(wishlistQuery, (snap) => setWishlistItems(snap.docs.map(d => d.id)));
+        unsubscribeWishlist = onSnapshot(wishlistQuery, (snap) =>
+          setWishlistItems(snap.docs.map((d) => d.id))
+        );
 
         const ordersQuery = query(collection(db, "orders"), where("userId", "==", user.uid));
         unsubscribeOrders = onSnapshot(ordersQuery, (snap) => {
-          setOrders(snap.docs.map(d => ({ 
-            id: d.data().orderId || d.id,
-            date: d.data().createdAt?.toDate?.().toLocaleDateString("en-IN") || "Recent",
-            hostelName: d.data().hostelName || "Hostel",
-            campusName: d.data().campus || "IIT",
-            total: Number(d.data().grandTotal || 0),
-            itemsCount: d.data().items?.reduce((a: number, i: any) => a + (i.quantity || 1), 0) || 0,
-            status: d.data().status || "Received",
-            paymentStatus:
-              d.data().paymentStatus === "verified" || d.data().paymentStatus === "rejected"
-                ? d.data().paymentStatus
-                : "pending_verification",
-            paymentFeedback: d.data().paymentFeedback || ""
-          })));
+          const sortedDocs = [...snap.docs]
+            .filter((d) => d.data().isDeleted !== true)
+            .sort((a, b) => {
+              const aMs = a.data().createdAt?.toMillis?.() ?? 0;
+              const bMs = b.data().createdAt?.toMillis?.() ?? 0;
+              return bMs - aMs;
+            });
+
+          setOrders(
+            sortedDocs.map((d) => ({
+              id: d.data().orderId || d.id,
+              date: d.data().createdAt?.toDate?.().toLocaleDateString("en-IN") || "Recent",
+              hostelName: d.data().hostelName || "Hostel",
+              campusName: d.data().campus || "IIT",
+              total: Number(d.data().grandTotal || 0),
+              itemsCount: d.data().items?.reduce((a: number, i: any) => a + (i.quantity || 1), 0) || 0,
+              status: d.data().status || "Received",
+              paymentStatus:
+                d.data().paymentStatus === "verified" || d.data().paymentStatus === "rejected"
+                  ? d.data().paymentStatus
+                  : "pending_verification",
+              paymentFeedback: d.data().paymentFeedback || "",
+            }))
+          );
         });
       } else {
         setIsLoggedIn(false);
@@ -288,7 +316,6 @@ export default function App() {
         setWishlistItems([]);
         setCartItems([]);
         localStorage.removeItem("unora_cart");
-        if (unsubscribeOrders) unsubscribeOrders();
       }
       setAuthResolved(true);
     });
@@ -296,6 +323,7 @@ export default function App() {
     return () => {
       unsubscribeAuth();
       if (unsubscribeOrders) unsubscribeOrders();
+      if (unsubscribeWishlist) unsubscribeWishlist();
     };
   }, []);
 
@@ -325,13 +353,14 @@ export default function App() {
     }
   };
 
-  const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0)
-  const [appliedDiscount, setAppliedDiscount] = useState(0)
-   const [activeCoupon, setActiveCoupon] = useState<string | null>(null)
-   const handleApplyDiscount = (amount: number, code: string | null) => {
-    setAppliedDiscount(amount)
-    setActiveCoupon(code)
-  }
+  const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
+  const [activeCoupon, setActiveCoupon] = useState<string | null>(null);
+  const handleApplyDiscount = (amount: number, code: string | null) => {
+    setAppliedDiscount(amount);
+    setActiveCoupon(code);
+  };
+
   const handleAddCatalogProduct = (product: Product, size: string = "L") => {
     if (!isLoggedIn || !auth.currentUser) {
       setToastMessage("Please Sign In to start your campus collection.");
@@ -432,25 +461,25 @@ export default function App() {
       prev
         .map((item) => {
           if (item.id === id) {
-            const nextQty = item.quantity + delta
-            return nextQty > 0 ? { ...item, quantity: nextQty } : null
+            const nextQty = item.quantity + delta;
+            return nextQty > 0 ? { ...item, quantity: nextQty } : null;
           }
-          return item
+          return item;
         })
         .filter(Boolean) as CartItem[]
-    )
-  }
+    );
+  };
 
   const handleRemoveItem = (id: string | number) => {
     setCartItems((prev) => {
-      const next = prev.filter((item) => item.id !== id)
+      const next = prev.filter((item) => item.id !== id);
       if (next.length === 0) {
-        setAppliedDiscount(0)
-        setActiveCoupon(null)
+        setAppliedDiscount(0);
+        setActiveCoupon(null);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const computeInitials = (name: string) => {
     if (!name) return "UN";
@@ -477,7 +506,13 @@ export default function App() {
     try {
       await auth.signOut();
       setCartItems([]);
+      setIsAdminOpen(false);
+      setIsAccountOpen(false);
+      setIsCheckoutOpen(false);
+      setIsCartOpen(false);
+      setIsWishlistOpen(false);
       localStorage.removeItem("unora_cart");
+      sessionStorage.clear();
       setToastMessage("Logged out successfully.");
       setToast(true);
       window.setTimeout(() => setToast(false), 2500);
@@ -521,13 +556,14 @@ export default function App() {
   };
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handlePreloaderComplete = useCallback(() => {
     sessionStorage.setItem("unora_preloader_done", "true");
     setLoading(false);
   }, []);
+
   return (
     <>
       {loading && <Preloader onComplete={handlePreloaderComplete} />}
@@ -630,9 +666,9 @@ export default function App() {
           onClose={() => setStaticInfoType(null)}
         />
         <AdminPortal
-  isOpen={isAdminOpen}
-  onClose={() => setIsAdminOpen(false)}
-/>
+          isOpen={isAdminOpen}
+          onClose={() => setIsAdminOpen(false)}
+        />
         <CartSidebar
           isOpen={isCartOpen}
           onClose={() => setIsCartOpen(false)}
@@ -707,7 +743,7 @@ export default function App() {
             setTrackingOrderId(id);
           }}
         />
-        
+
         <TrackingModal
           isOpen={!!trackingOrderId}
           onClose={() => setTrackingOrderId(null)}
@@ -742,5 +778,5 @@ export default function App() {
       </div>
       <Analytics />
     </>
-  )
+  );
 }
