@@ -256,11 +256,8 @@ export default function App() {
             const data = userDoc.data();
             finalName = ((data.firstName || "") + " " + (data.lastName || "")).trim();
 
-            if (!adminStatus && Array.isArray(data.cart)) {
+            if (Array.isArray(data.cart) && data.cart.length > 0) {
               setCartItems(data.cart);
-            } else if (adminStatus) {
-              setCartItems([]);
-              localStorage.removeItem("unora_cart");
             }
           }
 
