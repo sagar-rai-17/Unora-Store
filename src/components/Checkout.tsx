@@ -28,6 +28,8 @@ const CAMPUSES = [
   "Others",
 ];
 
+const PENDING_ORDER_KEY = "unora_pending_order";
+
 export const Checkout: React.FC<CheckoutProps> = ({
   isOpen,
   onClose,
@@ -37,22 +39,35 @@ export const Checkout: React.FC<CheckoutProps> = ({
 }) => {
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
+  const [deliveryType, setDeliveryType] = useState<"campus" | "other">("campus");
   const [selectedCampus, setSelectedCampus] = useState("");
   const [otherCampus, setOtherCampus] = useState("");
   const [hostelName, setHostelName] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
+  const [fullAddress, setFullAddress] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
-  const paymentMethod = "upi";
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
 
   const [pendingOrder, setPendingOrder] = useState<{
     orderId: string;
     grandTotal: number;
+    deliveryType: "campus" | "other";
+    fullName: string;
+    mobile: string;
     hostel: string;
+    roomNumber: string;
     campus: string;
-  } | null>(null);
+    fullAddress: string;
+    deliveryNote: string;
+  } | null>(() => {
+    try {
+      const saved = sessionStorage.getItem(PENDING_ORDER_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   React.useEffect(() => {
     if (pendingOrder && items.length === 0) {
@@ -71,11 +86,11 @@ export const Checkout: React.FC<CheckoutProps> = ({
   const totalCustomFee = items.reduce((acc, item) => {
     return acc + (item.customFee || 0) * item.quantity;
   }, 0);
-
-  const deliveryFee = items.length > 0 ? 40 : 0;
+const deliveryFee = items.length > 0 ? (deliveryType === "campus" ? 40 : 100) : 0;
   const grandTotal = Math.max(0, itemsTotal - appliedDiscount) + deliveryFee + totalCustomFee;
 
   const handleCloseCheckout = () => {
+    sessionStorage.removeItem(PENDING_ORDER_KEY);
     setPendingOrder(null);
     onClose();
   };
@@ -88,16 +103,23 @@ export const Checkout: React.FC<CheckoutProps> = ({
     if (!mobile.trim() || mobile.replace(/\D/g, "").length !== 10) {
       newErrors.mobile = "Valid 10-digit mobile number required.";
     }
-    if (!hostelName.trim()) {
-      newErrors.hostelName = "Hostel Name / Number is mandatory.";
-    }
-    if (!roomNumber.trim()) {
-      newErrors.roomNumber = "Room Number is mandatory.";
-    }
-    if (!selectedCampus) {
-      newErrors.campus = "Please select your campus.";
-    } else if (selectedCampus === "Others" && !otherCampus.trim()) {
-      newErrors.otherCampus = "Please enter your college / campus name.";
+
+    if (deliveryType === "campus") {
+      if (!hostelName.trim()) {
+        newErrors.hostelName = "Hostel Name / Number is mandatory.";
+      }
+      if (!roomNumber.trim()) {
+        newErrors.roomNumber = "Room Number is mandatory.";
+      }
+      if (!selectedCampus) {
+        newErrors.campus = "Please select your campus.";
+      } else if (selectedCampus === "Others" && !otherCampus.trim()) {
+        newErrors.otherCampus = "Please enter your college / campus name.";
+      }
+    } else {
+      if (!fullAddress.trim() || fullAddress.trim().length < 10) {
+        newErrors.fullAddress = "Please enter your complete delivery address with pincode.";
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -107,15 +129,30 @@ export const Checkout: React.FC<CheckoutProps> = ({
 
     setErrors({});
     const generatedOrderId = `UNR-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`;
-    const finalCampus = selectedCampus === "Others" ? otherCampus.trim() : selectedCampus;
+    const finalCampus =
+      deliveryType === "campus"
+        ? selectedCampus === "Others"
+          ? otherCampus.trim()
+          : selectedCampus
+        : "Outside Campus";
 
-    setPendingOrder({
+    const nextPending = {
       orderId: generatedOrderId,
       grandTotal,
-      hostel: hostelName.trim(),
+      deliveryType,
+      fullName: fullName.trim(),
+      mobile: mobile.trim(),
+      hostel: deliveryType === "campus" ? hostelName.trim() : fullAddress.trim(),
+      roomNumber: deliveryType === "campus" ? roomNumber.trim() : "",
       campus: finalCampus,
-    });
+      fullAddress: deliveryType === "other" ? fullAddress.trim() : "",
+      deliveryNote: deliveryNote.trim(),
+    };
+
+    sessionStorage.setItem(PENDING_ORDER_KEY, JSON.stringify(nextPending));
+    setPendingOrder(nextPending);
   };
+  
 
   const handlePaymentClaimSubmitted = async (
     submittedOrderId: string,
@@ -140,15 +177,15 @@ export const Checkout: React.FC<CheckoutProps> = ({
         await emailjs.send(
           serviceId,
           templateId,
-          {
+            {
             order_id: submittedOrderId,
-            customer_name: fullName.trim(),
-            customer_phone: mobile.trim(),
+            customer_name: pendingOrder?.fullName || fullName.trim(),
+            customer_phone: pendingOrder?.mobile || mobile.trim(),
             to_email: auth.currentUser?.email || "",
             campus: submittedCampus,
             hostel_name: submittedHostel,
-            room_number: roomNumber.trim(),
-            delivery_note: deliveryNote.trim() || "None",
+            room_number: pendingOrder?.roomNumber || roomNumber.trim() || "N/A",
+            delivery_note: pendingOrder?.deliveryNote || deliveryNote.trim() || "None",
             items_summary: itemsSummary,
             grand_total: pendingOrder?.grandTotal ?? grandTotal,
             payment_status: "Pending Verification",
@@ -159,7 +196,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
     } catch (emailErr) {
       console.error(emailErr);
     }
-
+    sessionStorage.removeItem(PENDING_ORDER_KEY);
     setPendingOrder(null);
     onOrderSuccess(submittedOrderId, submittedHostel, submittedCampus);
     onClose();
@@ -191,12 +228,14 @@ export const Checkout: React.FC<CheckoutProps> = ({
             userId: auth.currentUser?.uid || "guest",
             customerEmail: auth.currentUser?.email || "",
             orderId: pendingOrder.orderId,
-            fullName: fullName.trim(),
-            mobile: mobile.trim(),
+            fullName: pendingOrder.fullName,
+            mobile: pendingOrder.mobile,
+            deliveryType: pendingOrder.deliveryType,
             campus: pendingOrder.campus,
             hostelName: pendingOrder.hostel,
-            roomNumber: roomNumber.trim(),
-            deliveryNote: deliveryNote.trim(),
+            roomNumber: pendingOrder.roomNumber,
+            fullAddress: pendingOrder.fullAddress,
+            deliveryNote: pendingOrder.deliveryNote,
             paymentMethod: "upi",
             paymentStatus: "pending_verification",
             items: items.map((it) => ({
@@ -272,6 +311,55 @@ export const Checkout: React.FC<CheckoutProps> = ({
                 </div>
 
                 <div>
+                  <label className="block text-xs font-black tracking-wider uppercase mb-2">
+                    Delivery Location *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryType("campus");
+                        setErrors({});
+                      }}
+                      className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                        deliveryType === "campus"
+                          ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+                          : "bg-transparent border-[#3C1A11]/40 text-[#3C1A11] hover:border-[#3C1A11]"
+                      }`}
+                    >
+                      <span className="block text-xs font-black uppercase tracking-wider">
+                        Choose Your Campus
+                      </span>
+                      <span className="block text-[10px] font-bold opacity-80 mt-0.5">
+                        Hostel delivery
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryType("other");
+                        setErrors({});
+                      }}
+                      className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                        deliveryType === "other"
+                          ? "bg-[#3C1A11] border-[#3C1A11] text-[#BDF119]"
+                          : "bg-transparent border-[#3C1A11]/40 text-[#3C1A11] hover:border-[#3C1A11]"
+                      }`}
+                    >
+                      <span className="block text-xs font-black uppercase tracking-wider">
+                        Other Place (Outside Campus)
+                      </span>
+                      <span className="block text-[10px] font-bold opacity-80 mt-0.5">
+                        Any address in India
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {deliveryType === "campus" ? (
+                <>
+                <div>
                   <label className="block text-xs font-black tracking-wider uppercase mb-1.5">
                     Select Your Campus *
                   </label>
@@ -342,6 +430,26 @@ export const Checkout: React.FC<CheckoutProps> = ({
                     )}
                   </div>
                 </div>
+                </>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-black tracking-wider uppercase mb-1.5">
+                      Full Delivery Address (with City, State & Pincode) *
+                    </label>
+                    <textarea
+                      value={fullAddress}
+                      onChange={(e) => setFullAddress(e.target.value)}
+                      placeholder="House/Flat No., Street, Landmark, City, State - Pincode"
+                      rows={3}
+                      className="w-full p-4 rounded-xl border-2 border-[#3C1A11] bg-transparent text-sm font-bold focus:border-[#2952CC] outline-none resize-none"
+                    />
+                    {errors.fullAddress && (
+                      <span className="text-[10px] font-bold text-[#D94F27] block mt-1">
+                        {errors.fullAddress}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-black tracking-wider uppercase mb-1.5">
@@ -445,7 +553,7 @@ export const Checkout: React.FC<CheckoutProps> = ({
 
                           {deliveryFee > 0 && (
                             <div className="flex justify-between text-[#3C1A11]">
-                              <span>Hostel Delivery Charge</span>
+                              <span>{deliveryType === "campus" ? "Campus Delivery Charge" : "Outside Campus Delivery Charge"}</span>
                               <span>+₹{deliveryFee.toLocaleString("en-IN")}.00</span>
                             </div>
                           )}
@@ -475,10 +583,10 @@ export const Checkout: React.FC<CheckoutProps> = ({
                 <button
                   type="submit"
                   form="checkout-form"
-                  disabled={isSubmitting || items.length === 0}
+                  disabled={items.length === 0}
                   className="w-full h-14 bg-[#D94F27] hover:bg-[#F47E20] disabled:bg-[#3C1A11]/30 text-[#FFE2C7] font-black uppercase text-sm tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  {isSubmitting ? "CREATING ORDER..." : "PLACE YOUR ORDER"}
+                  PLACE YOUR ORDER
                 </button>
 
                 <div className="text-[10px] font-semibold text-[#3C1A11]/60 text-center space-y-1">

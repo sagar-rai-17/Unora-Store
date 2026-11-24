@@ -61,6 +61,8 @@ export interface AdminOrder {
   status: OrderStatus;
   items: OrderItem[];
   createdAt?: any;
+  deliveryType?: "campus" | "other";
+  fullAddress?: string;
 }
 
 interface AdminPortalProps {
@@ -448,6 +450,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
             createdAt: formattedDate,
             customerEmail: data.customerEmail || "",
             paymentFeedback: data.paymentFeedback || "",
+            deliveryType: data.deliveryType || "campus",
+            fullAddress: data.fullAddress || "",
           };
         });
         setOrders(fetched);
@@ -619,7 +623,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
   const metrics = useMemo(() => {
     const totalOrders = validOrders.length;
     const totalRevenue = validOrders
-      .filter((order) => order.paymentStatus === "verified")
+      .filter(
+        (order) =>
+          order.paymentStatus === "verified" &&
+          (order.status === "In Transit" || order.status === "Delivered")
+      )
       .reduce((acc, order) => acc + order.grandTotal, 0);
     const customItemsCount = validOrders.reduce((acc, order) => {
       const customsInOrder = order.items.reduce((itemAcc, item) => {
@@ -1073,7 +1081,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {CAMPUSES.map((camp) => (
+              {[...CAMPUSES, "Outside Campus"].map((camp) => (
                 <button
                   key={camp}
                   onClick={() => setSelectedCampus(camp)}
@@ -1141,7 +1149,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ isOpen, onClose }) => 
                           <td className="py-3 px-4 align-top">
                             <span className="font-black text-[11px] uppercase text-[#D94F27] block">{order.campus}</span>
                             <span className="font-bold text-xs block text-[#3C1A11] mt-0.5">
-                              {order.hostelName} - Room {order.roomNumber}
+                              {order.deliveryType === "other"
+                                ? order.fullAddress || order.hostelName
+                                : `${order.hostelName} - Room ${order.roomNumber}`}
                             </span>
                             {order.deliveryNote && (
                               <span className="text-[10px] font-medium text-[#3C1A11]/60 italic block mt-1 bg-[#3C1A11]/5 p-1 rounded">

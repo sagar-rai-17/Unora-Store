@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { buildUpiPaymentUri, UNORA_UPI_ID } from "../utils/upiQr";
 
@@ -24,6 +24,8 @@ interface UpiPaymentStepProps {
     items: any[];
     grandTotal: number;
     status: "Received";
+    deliveryType?: "campus" | "other";
+    fullAddress?: string;
   };
   onSubmitted: (orderId: string, hostel: string, campus: string) => void;
 }
@@ -40,6 +42,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const submitLockRef = useRef(false);
 
   const upiUri = buildUpiPaymentUri({
     amount: grandTotal,
@@ -86,6 +89,8 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
 
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
+
     const cleanUpi = payerUpiId.trim();
     const cleanRef = transactionRefId.trim();
 
@@ -102,6 +107,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
       return;
     }
 
+    submitLockRef.current = true;
     setError(null);
     setIsSubmitting(true);
 
@@ -116,7 +122,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
     });
 
     try {
-      await addDoc(collection(db, "orders"), {
+      await setDoc(doc(db, "orders", orderId), {
         ...orderPayload,
         payerUpiId: cleanUpi,
         transactionRefId: cleanRef,
@@ -132,6 +138,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({
       console.error("Failed to submit payment details:", err);
       setError("Could not submit payment details. Please check your connection and try again.");
       setIsSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 

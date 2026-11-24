@@ -28,6 +28,7 @@ import { StaticInfoModal, type StaticInfoType } from "./components/StaticInfoMod
 import { AboutUsModal } from "./components/AboutUsModal";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { useHistoryOverlay} from "./hooks/useHistoryOverlay";
+const getSessionFlag = (key: string) => sessionStorage.getItem(key) === "true";
 
 export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
@@ -54,6 +55,12 @@ export default function App() {
   const [inventoryProducts, setInventoryProducts] = useState<Product[]>([]);
   const [selectedDetailProduct, setSelectedDetailProduct] = useState<Product | null>(null);
   const [studioProduct, setStudioProduct] = useState<Product | null>(null);
+  const [pendingDetailId, setPendingDetailId] = useState<string | null>(() =>
+    sessionStorage.getItem("unora_detail_id")
+  );
+  const [pendingStudioId, setPendingStudioId] = useState<string | null>(() =>
+    sessionStorage.getItem("unora_studio_id")
+  );
   const [selectedCategory, setSelectedCategory] = useState<"all" | "men" | "women">("all");
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -135,16 +142,18 @@ export default function App() {
   }, [cartItems]);
   const [isOrderSuccessOpen, setIsOrderSuccessOpen] = useState(false)
   const [orderDetails, setOrderDetails] = useState({ id: "", hostel: "", campus: "" })
-  const [isCartOpen, setIsCartOpen] = useState(false)
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(
+    () => sessionStorage.getItem("unora_preloader_done") !== "true"
+  );
   const [toast, setToast] = useState(false)
   const [toastMessage, setToastMessage] = useState("Added to your bag")
   const [isAuthOpen, setIsAuthOpen] = useState(false)
-  const [isAccountOpen, setIsAccountOpen] = useState(false)
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(() => getSessionFlag("unora_open_cart"));
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(() => getSessionFlag("unora_open_checkout"));
+  const [isAccountOpen, setIsAccountOpen] = useState(() => getSessionFlag("unora_open_account"));
+  const [isAdminOpen, setIsAdminOpen] = useState(() => getSessionFlag("unora_open_admin"));
+  const [isWishlistOpen, setIsWishlistOpen] = useState(() => getSessionFlag("unora_open_wishlist"));
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isWishlistOpen, setIsWishlistOpen] = useState(false);
   const closeDetailProduct = useCallback(() => {
     setSelectedDetailProduct(null);
     if (window.location.search) {
@@ -165,6 +174,52 @@ export default function App() {
   useHistoryOverlay("about", isAboutOpen, useCallback(() => setIsAboutOpen(false), []));
   useHistoryOverlay("feedback", isFeedbackOpen, useCallback(() => setIsFeedbackOpen(false), []));
   useHistoryOverlay("static-info", !!staticInfoType, useCallback(() => setStaticInfoType(null), []));
+
+  useEffect(() => {
+    sessionStorage.setItem("unora_open_cart", String(isCartOpen));
+    sessionStorage.setItem("unora_open_checkout", String(isCheckoutOpen));
+    sessionStorage.setItem("unora_open_account", String(isAccountOpen));
+    sessionStorage.setItem("unora_open_admin", String(isAdminOpen));
+    sessionStorage.setItem("unora_open_wishlist", String(isWishlistOpen));
+
+    if (selectedDetailProduct) {
+      sessionStorage.setItem("unora_detail_id", selectedDetailProduct.id);
+    } else if (!pendingDetailId) {
+      sessionStorage.removeItem("unora_detail_id");
+    }
+
+    if (studioProduct) {
+      sessionStorage.setItem("unora_studio_id", studioProduct.id);
+    } else if (!pendingStudioId) {
+      sessionStorage.removeItem("unora_studio_id");
+    }
+  }, [
+    isCartOpen,
+    isCheckoutOpen,
+    isAccountOpen,
+    isAdminOpen,
+    isWishlistOpen,
+    selectedDetailProduct,
+    studioProduct,
+    pendingDetailId,
+    pendingStudioId,
+  ]);
+
+  useEffect(() => {
+    if (inventoryProducts.length === 0) return;
+
+    if (pendingDetailId) {
+      const match = inventoryProducts.find((p) => p.id === pendingDetailId && p.isHidden !== true);
+      if (match) setSelectedDetailProduct(match);
+      setPendingDetailId(null);
+    }
+
+    if (pendingStudioId) {
+      const match = inventoryProducts.find((p) => p.id === pendingStudioId && p.isHidden !== true);
+      if (match) setStudioProduct(match);
+      setPendingStudioId(null);
+    }
+  }, [inventoryProducts, pendingDetailId, pendingStudioId]);
 
   useEffect(() => {
     let unsubscribeOrders: (() => void) | null = null;
@@ -470,6 +525,7 @@ export default function App() {
   }
 
   const handlePreloaderComplete = useCallback(() => {
+    sessionStorage.setItem("unora_preloader_done", "true");
     setLoading(false);
   }, []);
   return (
